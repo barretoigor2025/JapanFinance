@@ -4,6 +4,7 @@ import { useSettings } from "./hooks/useSettings.js";
 import { useGastos } from "./hooks/useGastos.js";
 import { useCarro } from "./hooks/useCarro.js";
 import { useAudit } from "./hooks/useAudit.js";
+import { useExtras } from "./hooks/useExtras.js";
 import { dbSet } from "./db/db.js";
 import { Spinner } from "./components/ui.jsx";
 import { BackupModal } from "./components/BackupModal.jsx";
@@ -11,14 +12,17 @@ import { Dashboard } from "./screens/Dashboard.jsx";
 import { Entries } from "./screens/Entries.jsx";
 import { Reports } from "./screens/Reports.jsx";
 import { Gastos } from "./screens/Gastos.jsx";
+import { SuperFinance } from "./screens/SuperFinance.jsx";
 import { Settings } from "./screens/Settings.jsx";
+import { normalizeExtras } from "./utils/backup.js";
 
 const TABS = [
-  { id: "dashboard", label: "Início",     icon: "🏠" },
-  { id: "entries",   label: "Turnos",     icon: "🕐" },
-  { id: "gastos",    label: "Gastos",     icon: "💰" },
-  { id: "reports",   label: "Relatórios", icon: "📊" },
-  { id: "config",    label: "Config",     icon: "⚙️" },
+  { id: "dashboard", label: "Início", icon: "🏠" },
+  { id: "entries", label: "Turnos", icon: "🕐" },
+  { id: "finance", label: "Controle", icon: "🧠" },
+  { id: "gastos", label: "Gastos", icon: "💰" },
+  { id: "reports", label: "Relatórios", icon: "📊" },
+  { id: "config", label: "Config", icon: "⚙️" },
 ];
 
 export default function App() {
@@ -31,8 +35,9 @@ export default function App() {
   const { gastos, setGastos, loading: lg } = useGastos();
   const { carro, setCarro, loading: lc } = useCarro();
   const { auditHistory, setAuditHistory, loading: la } = useAudit();
+  const { extras, setExtras, loading: lx } = useExtras();
 
-  const loading = le || ls || lg || lc || la;
+  const loading = le || ls || lg || lc || la || lx;
 
   useEffect(() => {
     localStorage.setItem("jst3_theme", theme);
@@ -45,11 +50,14 @@ export default function App() {
   const backupAlert = daysSince === null || daysSince > 7;
 
   async function handleRestore(data) {
+    const restoredExtras = normalizeExtras(data);
     if (data.entries) { await dbSet("entries", data.entries); setEntries(data.entries); }
     if (data.settings) { await dbSet("settings", data.settings); setSettings(s => ({ ...s, ...data.settings })); }
     if (data.gastos) { await dbSet("gastos", data.gastos); setGastos(g => ({ ...g, ...data.gastos })); }
     if (data.carro) { await dbSet("carro", data.carro); setCarro(c => ({ ...c, ...data.carro })); }
     if (data.auditHistory) { await dbSet("auditHistory", data.auditHistory); setAuditHistory(data.auditHistory); }
+    await dbSet("extras", restoredExtras);
+    setExtras(restoredExtras);
   }
 
   if (loading) {
@@ -62,15 +70,14 @@ export default function App() {
 
   return (
     <div className={`theme-${theme} min-h-screen flex flex-col`} style={{ background: "var(--bg)" }}>
-      {/* Top bar */}
       <header
         className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 border-b"
         style={{ background: "var(--nav-bg)", borderColor: "var(--nav-border)", backdropFilter: "blur(12px)" }}
       >
         <div className="flex items-center gap-2">
           <span className="text-base">⛩️</span>
-          <span className="text-sm font-bold" style={{ color: "var(--text)" }}>給与管理</span>
-          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--bg-elevated)", color: "var(--text-muted)", border: "1px solid var(--border-mid)" }}>v3</span>
+          <span className="text-sm font-bold" style={{ color: "var(--text)" }}>Japan Salary Tracker</span>
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--bg-elevated)", color: "var(--text-muted)", border: "1px solid var(--border-mid)" }}>v5</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -91,25 +98,24 @@ export default function App() {
         </div>
       </header>
 
-      {/* Screen */}
       <main className="flex-1 overflow-y-auto px-4 pt-4 max-w-lg mx-auto w-full">
         {tab === "dashboard" && <Dashboard entries={entries} settings={settings} onAddEntry={addEntry} />}
-        {tab === "entries"   && <Entries entries={entries} settings={settings} onAddEntry={addEntry} onDeleteEntry={deleteEntry} />}
-        {tab === "gastos"    && <Gastos gastos={gastos} setGastos={setGastos} carro={carro} setCarro={setCarro} />}
-        {tab === "reports"   && <Reports entries={entries} settings={settings} />}
-        {tab === "config"    && <Settings settings={settings} setSettings={setSettings} entries={entries} auditHistory={auditHistory} setAuditHistory={setAuditHistory} />}
+        {tab === "entries" && <Entries entries={entries} settings={settings} onAddEntry={addEntry} onDeleteEntry={deleteEntry} />}
+        {tab === "finance" && <SuperFinance entries={entries} settings={settings} gastos={gastos} extras={extras} />}
+        {tab === "gastos" && <Gastos gastos={gastos} setGastos={setGastos} carro={carro} setCarro={setCarro} />}
+        {tab === "reports" && <Reports entries={entries} settings={settings} />}
+        {tab === "config" && <Settings settings={settings} setSettings={setSettings} entries={entries} auditHistory={auditHistory} setAuditHistory={setAuditHistory} />}
       </main>
 
-      {/* Bottom nav */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-40 border-t"
         style={{ background: "var(--nav-bg)", borderColor: "var(--nav-border)", backdropFilter: "blur(12px)", paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="flex max-w-lg mx-auto">
+        <div className="flex max-w-lg mx-auto overflow-x-auto">
           {TABS.map(t => {
             const active = tab === t.id;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className="flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-colors">
+              <button key={t.id} onClick={() => setTab(t.id)} className="min-w-[4.5rem] flex-1 flex flex-col items-center gap-0.5 py-2.5 transition-colors">
                 <span className="text-base leading-none">{t.icon}</span>
                 <span className="text-xs font-medium" style={{ color: active ? "var(--nav-active)" : "var(--nav-inactive)" }}>{t.label}</span>
                 {active && <span className="w-4 h-0.5 rounded-full" style={{ background: "var(--nav-active)" }} />}
@@ -126,6 +132,7 @@ export default function App() {
           gastos={gastos}
           carro={carro}
           auditHistory={auditHistory}
+          extras={extras}
           onRestore={handleRestore}
           onClose={() => setShowBackup(false)}
         />
