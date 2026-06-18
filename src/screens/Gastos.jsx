@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { Card, SectionLabel, Badge, Input, BottomSheet } from "../components/ui.jsx";
 import { YEN, fmtDate, currentMonth, prevMonth, nextMonth } from "../utils/fmt.js";
-import { Carro } from "./Carro.jsx";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function nanoid() {
@@ -16,15 +15,13 @@ function fmtMonthLabel(ym) {
 }
 
 // ── Gastos Screen ──────────────────────────────────────────────────────────────
-export function Gastos({ gastos, setGastos, carro, setCarro }) {
-  const [tab, setTab] = useState("gastos"); // "gastos" | "carro"
+export function Gastos({ gastos, setGastos }) {
   const [month, setMonth] = useState(currentMonth());
   const [editMode, setEditMode] = useState(false);
   const [toast, setToast] = useState("");
 
   // modal states
   const [itemModal, setItemModal] = useState(null); // {tipo, id?, name, amount, isMonth}
-  const [cartaoModal, setCartaoModal] = useState(null); // {id?, nome, valor}
   const [deleteConfirm, setDeleteConfirm] = useState(null); // id to delete
 
   function showToast(msg) {
@@ -36,8 +33,6 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
   const overrides = gastos.overrides?.[month] || {};
   const monthHidden = gastos.monthHidden?.[month] || [];
   const monthItems = gastos.monthItems?.[month] || [];
-  const cartaoItems = gastos.cartao?.[month] || [];
-
   function getVal(item) {
     return overrides[item.id] !== undefined ? overrides[item.id] : item.amount;
   }
@@ -69,9 +64,7 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
     activeHagaki.reduce((s, d) => s + getVal(d), 0) +
     monthHagakiItems.reduce((s, d) => s + d.amount, 0);
 
-  const totalCartao = cartaoItems.reduce((s, c) => s + (c.valor || 0), 0);
-
-  const totalDespesas = totalDebito + totalHagaki + totalCartao;
+  const totalDespesas = totalDebito + totalHagaki;
   const saldo = totalRenda - totalDespesas;
 
   const expenseRatio = totalRenda > 0 ? Math.min(100, (totalDespesas / totalRenda) * 100) : 0;
@@ -191,32 +184,6 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
     });
   }
 
-  // ── cartão mutators ────────────────────────────────────────────────────────
-  function saveCartaoModal() {
-    if (!cartaoModal) return;
-    const valor = parseFloat(String(cartaoModal.valor).replace(/[^0-9.]/g, "")) || 0;
-    update(g => {
-      if (!g.cartao) g.cartao = {};
-      if (!g.cartao[month]) g.cartao[month] = [];
-      if (cartaoModal.id) {
-        const idx = g.cartao[month].findIndex(c => c.id === cartaoModal.id);
-        if (idx !== -1) { g.cartao[month][idx].nome = cartaoModal.nome; g.cartao[month][idx].valor = valor; }
-      } else {
-        g.cartao[month].push({ id: nanoid(), nome: cartaoModal.nome, valor });
-      }
-      return g;
-    });
-    setCartaoModal(null);
-  }
-
-  function deleteCartaoItem(id) {
-    update(g => {
-      if (!g.cartao?.[month]) return g;
-      g.cartao[month] = g.cartao[month].filter(c => c.id !== id);
-      return g;
-    });
-  }
-
   // ── WhatsApp report ────────────────────────────────────────────────────────
   function copyReport() {
     const monthLabel = fmtMonthLabel(month);
@@ -247,18 +214,10 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
       lines.push("");
     }
 
-    if (totalCartao > 0) {
-      lines.push("💳 *CARTÃO DE CRÉDITO*");
-      cartaoItems.forEach(c => lines.push(`  ${c.nome}: ${YEN(c.valor)}`));
-      lines.push(`  Total: ${YEN(totalCartao)}`);
-      lines.push("");
-    }
-
     lines.push("———————————");
     lines.push(`Renda: ${YEN(totalRenda)}`);
     lines.push(`Débito Auto: ${YEN(totalDebito)}`);
     lines.push(`Hagaki: ${YEN(totalHagaki)}`);
-    if (totalCartao > 0) lines.push(`Cartão: ${YEN(totalCartao)}`);
     lines.push(`*Total Despesas: ${YEN(totalDespesas)}*`);
     lines.push(saldo >= 0 ? `*Saldo Final: +${YEN(saldo)}*` : `*Saldo Final: -${YEN(Math.abs(saldo))}*`);
     if (totalHagaki > 0) lines.push(`💵 Precisa sacar em mãos: ${YEN(totalHagaki)}`);
@@ -332,7 +291,7 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
         {/* value */}
         <button
           className="text-sm font-mono font-semibold shrink-0"
-          style={{ color: tipo === "renda" ? "var(--positive)" : tipo === "cartao" ? "var(--cc)" : "var(--negative)" }}
+          style={{ color: tipo === "renda" ? "var(--positive)" : "var(--negative)" }}
           onClick={() => isMonthItem ? openEditMonthItem(item, tipo) : openEditRecurring(item, tipo)}
         >
           {YEN(val)}
@@ -373,53 +332,8 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
-  if (tab === "carro") {
-    return (
-      <div className="flex flex-col min-h-screen" style={{ background: "var(--bg)", color: "var(--text)" }}>
-        {/* tab bar */}
-        <div className="flex gap-1 p-3 pb-0">
-          <button
-            onClick={() => setTab("gastos")}
-            className="flex-1 py-2 rounded-xl text-sm font-medium transition-colors"
-            style={{ background: "var(--bg-elevated)", color: "var(--text-sub)", border: "1px solid var(--border)" }}
-          >
-            Gastos
-          </button>
-          <button
-            onClick={() => setTab("carro")}
-            className="flex-1 py-2 rounded-xl text-sm font-medium"
-            style={{ background: "var(--text)", color: "var(--bg)" }}
-          >
-            Carro
-          </button>
-        </div>
-        <div className="flex-1">
-          <Carro carro={carro} setCarro={setCarro} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col min-h-screen pb-8" style={{ background: "var(--bg)", color: "var(--text)" }}>
-
-      {/* tab bar */}
-      <div className="flex gap-1 p-3 pb-0">
-        <button
-          onClick={() => setTab("gastos")}
-          className="flex-1 py-2 rounded-xl text-sm font-medium"
-          style={{ background: "var(--text)", color: "var(--bg)" }}
-        >
-          Gastos
-        </button>
-        <button
-          onClick={() => setTab("carro")}
-          className="flex-1 py-2 rounded-xl text-sm font-medium transition-colors"
-          style={{ background: "var(--bg-elevated)", color: "var(--text-sub)", border: "1px solid var(--border)" }}
-        >
-          Carro
-        </button>
-      </div>
 
       {/* header */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1 gap-2">
@@ -459,8 +373,6 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
               <span>Déb {YEN(totalDebito)}</span>
               <span className="mx-0.5">·</span>
               <span>Hag {YEN(totalHagaki)}</span>
-              <span className="mx-0.5">·</span>
-              <span style={{ color: "var(--cc)" }}>CC {YEN(totalCartao)}</span>
             </div>
           </div>
         </div>
@@ -643,53 +555,6 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
           </Card>
         </section>
 
-        {/* ── Cartão section ── */}
-        <section>
-          <div className="flex items-center justify-between mb-1">
-            <SectionLabel>💳 Cartão de Crédito</SectionLabel>
-          </div>
-          <Card>
-            {cartaoItems.length === 0 && (
-              <p className="text-xs py-2 text-center" style={{ color: "var(--text-muted)" }}>Nenhum lançamento</p>
-            )}
-            {cartaoItems.map(c => (
-              <div key={c.id} className="flex items-center gap-2 py-2 border-b last:border-0" style={{ borderColor: "var(--border)" }}>
-                <span className="flex-1 text-sm truncate" style={{ color: "var(--text)" }}>{c.nome}</span>
-                <span className="text-sm font-mono font-semibold shrink-0" style={{ color: "var(--cc)" }}>{YEN(c.valor)}</span>
-                <button
-                  onClick={() => setCartaoModal({ id: c.id, nome: c.nome, valor: c.valor })}
-                  className="w-6 h-6 flex items-center justify-center rounded text-xs"
-                  style={{ background: "var(--bg-elevated)", color: "var(--text-sub)" }}
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => deleteCartaoItem(c.id)}
-                  className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold"
-                  style={{ background: "rgba(239,68,68,0.12)", color: "var(--negative)" }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-
-            {cartaoItems.length > 0 && (
-              <div className="flex justify-between items-center pt-2 mt-1 border-t" style={{ borderColor: "var(--border)" }}>
-                <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>Total</span>
-                <span className="text-sm font-bold font-mono" style={{ color: "var(--cc)" }}>{YEN(totalCartao)}</span>
-              </div>
-            )}
-
-            <button
-              onClick={() => setCartaoModal({ id: null, nome: "", valor: "" })}
-              className="w-full mt-2 py-1.5 rounded-lg text-xs font-medium"
-              style={{ background: "var(--bg-elevated)", color: "var(--cc)", border: "1px solid var(--cc)" }}
-            >
-              + Adicionar
-            </button>
-          </Card>
-        </section>
-
       </div>
 
       {/* ── Item edit modal ── */}
@@ -769,79 +634,6 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
                 onClick={saveItemModal}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
                 style={{ background: "var(--positive)", color: "#fff" }}
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </BottomSheet>
-      )}
-
-      {/* ── Cartão modal ── */}
-      {cartaoModal && (
-        <BottomSheet
-          title={cartaoModal.id ? "Editar lançamento" : "Novo lançamento"}
-          onClose={() => setCartaoModal(null)}
-        >
-          <div className="p-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Descrição</label>
-              <input
-                autoFocus
-                className="rounded-lg px-3 py-2 text-sm focus:outline-none"
-                style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-mid)", color: "var(--text)" }}
-                value={cartaoModal.nome}
-                onChange={e => setCartaoModal(m => ({ ...m, nome: e.target.value }))}
-                placeholder="Ex: Supermercado"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Valor</label>
-              <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: "var(--bg-elevated)", border: "1px solid var(--border-mid)" }}>
-                <span className="text-sm font-semibold" style={{ color: "var(--text-muted)" }}>¥</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  className="flex-1 bg-transparent text-sm focus:outline-none"
-                  style={{ color: "var(--text)" }}
-                  value={cartaoModal.valor}
-                  onChange={e => setCartaoModal(m => ({ ...m, valor: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              {[1000, 3000, 5000, 10000].map(v => (
-                <button
-                  key={v}
-                  onClick={() => setCartaoModal(m => ({ ...m, valor: v }))}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-medium"
-                  style={{
-                    background: Number(cartaoModal.valor) === v ? "var(--text)" : "var(--bg-elevated)",
-                    color: Number(cartaoModal.valor) === v ? "var(--bg)" : "var(--text-sub)",
-                    border: "1px solid var(--border-mid)",
-                    minWidth: 56
-                  }}
-                >
-                  {YEN(v)}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => setCartaoModal(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium"
-                style={{ background: "var(--bg-elevated)", color: "var(--text-sub)", border: "1px solid var(--border-mid)" }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={saveCartaoModal}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: "var(--cc)", color: "#fff" }}
               >
                 Confirmar
               </button>

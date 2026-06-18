@@ -11,12 +11,16 @@ import { Dashboard } from "./screens/Dashboard.jsx";
 import { Entries } from "./screens/Entries.jsx";
 import { Reports } from "./screens/Reports.jsx";
 import { Gastos } from "./screens/Gastos.jsx";
+import { Cartao } from "./screens/Cartao.jsx";
+import { Carro } from "./screens/Carro.jsx";
 import { Settings } from "./screens/Settings.jsx";
 
 const TABS = [
   { id: "dashboard", label: "Início",     icon: "🏠" },
   { id: "entries",   label: "Turnos",     icon: "🕐" },
   { id: "gastos",    label: "Gastos",     icon: "💰" },
+  { id: "cartao",    label: "Cartão",     icon: "💳" },
+  { id: "carro",     label: "Carro",      icon: "🚗" },
   { id: "reports",   label: "Relatórios", icon: "📊" },
   { id: "config",    label: "Config",     icon: "⚙️" },
 ];
@@ -95,7 +99,9 @@ export default function App() {
       <main className="flex-1 overflow-y-auto px-4 pt-4 max-w-lg mx-auto w-full">
         {tab === "dashboard" && <Dashboard entries={entries} settings={settings} onAddEntry={addEntry} />}
         {tab === "entries"   && <Entries entries={entries} settings={settings} onAddEntry={addEntry} onDeleteEntry={deleteEntry} />}
-        {tab === "gastos"    && <Gastos gastos={gastos} setGastos={setGastos} carro={carro} setCarro={setCarro} />}
+        {tab === "gastos"    && <Gastos gastos={gastos} setGastos={setGastos} />}
+        {tab === "cartao"    && <Cartao gastos={gastos} setGastos={setGastos} />}
+        {tab === "carro"     && <Carro carro={carro} setCarro={setCarro} />}
         {tab === "reports"   && <Reports entries={entries} settings={settings} />}
         {tab === "config"    && <Settings settings={settings} setSettings={setSettings} entries={entries} auditHistory={auditHistory} setAuditHistory={setAuditHistory} />}
       </main>
