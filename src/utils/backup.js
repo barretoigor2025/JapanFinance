@@ -1,12 +1,25 @@
-export function exportBackup(entries, settings, gastos, carro, auditHistory) {
+export function normalizeExtras(data = {}) {
+  return {
+    gensen: data.gensen || data.extras?.gensen || [],
+    taxVehicles: data.taxVehicles || data.extras?.taxVehicles || [],
+    taxPayments: data.taxPayments || data.extras?.taxPayments || [],
+    cartao: data.cartao || data.extras?.cartao || {
+      setup: { name: "Cartão", closingDay: 15, dueDay: 11, limit: 0 },
+      lancamentos: [],
+    },
+  };
+}
+
+export function exportBackup(entries, settings, gastos, carro, auditHistory, extras) {
   const data = {
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     entries: entries || [],
     settings: settings || {},
     gastos: gastos || null,
     carro: carro || null,
     auditHistory: auditHistory || [],
+    ...normalizeExtras(extras || {}),
   };
   const json = JSON.stringify(data, null, 2);
   try {
@@ -26,5 +39,13 @@ export function parseBackup(jsonText) {
   if (!data.entries || !Array.isArray(data.entries)) {
     throw new Error("Arquivo inválido");
   }
-  return data;
+  const extras = normalizeExtras(data);
+  return {
+    ...data,
+    extras,
+    gensen: extras.gensen,
+    taxVehicles: extras.taxVehicles,
+    taxPayments: extras.taxPayments,
+    cartao: extras.cartao,
+  };
 }
