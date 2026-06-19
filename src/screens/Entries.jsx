@@ -59,56 +59,49 @@ export function Entries({ entries, settings, onAddEntry, onDeleteEntry }) {
           {monthEntries.map(e => {
             const c = calcsMap[e.id];
             const badge = dayTypeBadge[e.dayType];
+            const fullDate = new Date(e.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
             return (
               <Card key={e.id}>
-                <div className="flex items-start gap-3">
-                  {/* Date block */}
-                  <div className="shrink-0 text-center w-10">
-                    <div className="text-lg font-bold font-mono leading-tight" style={{ color: "var(--text)" }}>
-                      {e.date.slice(8)}
-                    </div>
-                    <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {new Date(e.date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" })}
-                    </div>
-                  </div>
+                {/* Top row: date + amount */}
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>{fullDate}</span>
+                  <span className="text-sm font-mono font-bold" style={{ color: "var(--positive)" }}>{YEN(c?.grossPay)}</span>
+                </div>
 
-                  {/* Main content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {e.dayType !== "yukyu" ? (
-                        <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{e.start} → {e.end}</span>
-                      ) : (
-                        <span className="text-sm font-medium" style={{ color: "var(--positive)" }}>有給休暇</span>
-                      )}
-                      {badge && <Badge color={badge.color}>{badge.label}</Badge>}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {e.dayType !== "yukyu" && <span className="text-xs" style={{ color: "var(--text-muted)" }}>{formatMinutes(c?.totalMin)}</span>}
-                      {c?.overtimeHours > 0 && <Badge color="yellow">HE {formatMinutes(c.overtimeDailyMin)}</Badge>}
-                      {c?.nightHours > 0 && <Badge color="purple">🌙 {formatMinutes(c.nightMin)}</Badge>}
-                      {e.note && <span className="text-xs italic truncate" style={{ color: "var(--text-muted)" }}>{e.note}</span>}
-                    </div>
-                    {deleteId === e.id && (
-                      <div className="mt-2">
-                        <ConfirmBar
-                          message="Excluir este lançamento?"
-                          onConfirm={() => { onDeleteEntry(e.id); setDeleteId(null); }}
-                          onCancel={() => setDeleteId(null)}
-                        />
-                      </div>
-                    )}
-                  </div>
+                {/* Middle row: time + hours + badges */}
+                <div className="flex items-center gap-2 flex-wrap mb-2">
+                  {e.dayType !== "yukyu" ? (
+                    <span className="text-xs" style={{ color: "var(--text-muted)" }}>{e.start} → {e.end}</span>
+                  ) : (
+                    <span className="text-xs" style={{ color: "var(--positive)" }}>有給休暇</span>
+                  )}
+                  {e.dayType !== "yukyu" && <span className="text-xs" style={{ color: "var(--text-muted)" }}>{formatMinutes(c?.totalMin)}</span>}
+                  {badge && <Badge color={badge.color}>{badge.label}</Badge>}
+                  {c?.overtimeHours > 0 && <Badge color="yellow">HE {formatMinutes(c.overtimeDailyMin)}</Badge>}
+                  {c?.nightHours > 0 && <Badge color="purple">🌙 {formatMinutes(c.nightMin)}</Badge>}
+                  {e.note && <span className="text-xs italic truncate" style={{ color: "var(--text-muted)" }}>{e.note}</span>}
+                </div>
 
-                  {/* Pay + actions */}
-                  <div className="shrink-0 text-right">
-                    <div className="text-sm font-mono font-bold" style={{ color: "var(--positive)" }}>{YEN(c?.grossPay)}</div>
-                    <div className="flex gap-1 mt-1 justify-end">
-                      <button onClick={() => setDetailEntry(e)} className="px-1.5 py-0.5 rounded text-xs" style={{ color: "var(--text-muted)", border: "1px solid var(--border-mid)" }}>≡</button>
-                      <button onClick={() => setEditEntry(e)} className="px-1.5 py-0.5 rounded text-xs" style={{ color: "var(--text-muted)", border: "1px solid var(--border-mid)" }}>✎</button>
-                      <button onClick={() => { onAddEntry({ ...e, id: Date.now().toString() }); }} className="px-1.5 py-0.5 rounded text-xs" style={{ color: "var(--text-muted)", border: "1px solid var(--border-mid)" }}>⎘</button>
-                      <button onClick={() => setDeleteId(e.id)} className="px-1.5 py-0.5 rounded text-xs" style={{ color: "var(--negative)", border: "1px solid var(--border-mid)" }}>✕</button>
-                    </div>
+                {/* Delete confirm */}
+                {deleteId === e.id && (
+                  <div className="mb-2">
+                    <ConfirmBar
+                      message="Excluir este lançamento?"
+                      onConfirm={() => { onDeleteEntry(e.id); setDeleteId(null); }}
+                      onCancel={() => setDeleteId(null)}
+                    />
                   </div>
+                )}
+
+                {/* Action links */}
+                <div className="flex gap-3 text-xs border-t pt-2" style={{ borderColor: "var(--border)", color: "var(--cc)" }}>
+                  <button onClick={() => setDetailEntry(e)} style={{ color: "var(--cc)" }}>Ver cálculo</button>
+                  <span style={{ color: "var(--border-mid)" }}>|</span>
+                  <button onClick={() => setEditEntry(e)} style={{ color: "var(--cc)" }}>Editar</button>
+                  <span style={{ color: "var(--border-mid)" }}>|</span>
+                  <button onClick={() => { onAddEntry({ ...e, id: Date.now().toString() }); }} style={{ color: "var(--cc)" }}>Duplicar</button>
+                  <span style={{ color: "var(--border-mid)" }}>|</span>
+                  <button onClick={() => setDeleteId(e.id)} style={{ color: "var(--negative)" }}>Excluir</button>
                 </div>
               </Card>
             );

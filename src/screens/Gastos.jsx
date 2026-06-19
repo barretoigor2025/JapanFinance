@@ -401,7 +401,7 @@ export function Gastos({ gastos, setGastos, carro, setCarro }) {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-8" style={{ background: "var(--bg)", color: "var(--text)" }}>
+    <div className="flex flex-col min-h-screen pb-28" style={{ background: "var(--bg)", color: "var(--text)" }}>
 
       {/* tab bar */}
       <div className="flex gap-1 p-3 pb-0">

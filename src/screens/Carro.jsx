@@ -118,7 +118,7 @@ export function Carro({ carro, setCarro }) {
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col pb-8 px-3 pt-3 gap-3" style={{ background: "var(--bg)", color: "var(--text)", minHeight: "100%" }}>
+    <div className="flex flex-col pb-28 px-3 pt-3 gap-3" style={{ background: "var(--bg)", color: "var(--text)", minHeight: "100%" }}>
 
       {/* empty state */}
       {fins.length === 0 && (
