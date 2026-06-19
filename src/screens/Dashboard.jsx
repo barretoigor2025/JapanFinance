@@ -26,6 +26,7 @@ export function Dashboard({ entries, settings, onAddEntry }) {
 
   const totalHours = calcs.reduce((a, c) => a + c.totalHours, 0);
   const otHours = calcs.reduce((a, c) => a + c.overtimeHours, 0);
+  const otHoursHigh = calcs.reduce((a, c) => a + (c.breakdown?.overtimeHigh || 0), 0);
   const grossSalary = calcs.reduce((a, c) => a + c.grossPay, 0);
   const totalTeate = (settings.teate || []).filter(t => t.active).reduce((a, t) => a + (t.amount || 0), 0);
   const grossWithTeate = Math.round(grossSalary + totalTeate);
@@ -87,18 +88,49 @@ export function Dashboard({ entries, settings, onAddEntry }) {
 
       {/* OT bar */}
       {otHours > 0 && (
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs" style={{ color: "var(--text-muted)" }}>
-            <span>Hora Extra acumulada</span>
-            <span>{otHours.toFixed(1)}h / 60h</span>
+        <Card>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-xs uppercase tracking-widest" style={{ color: "var(--text-muted)" }}>Hora Extra acumulada</div>
+            <div className="text-sm font-mono font-bold" style={{ color: otHours > 60 ? "var(--negative)" : "var(--warning)" }}>
+              {otHours.toFixed(1)}h <span className="font-normal text-xs" style={{ color: "var(--text-muted)" }}>/ 60h</span>
+            </div>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-elevated)" }}>
+
+          <div className="h-1.5 rounded-full overflow-hidden mb-2" style={{ background: "var(--bg-elevated)" }}>
             <div
               className="h-1.5 rounded-full transition-all"
               style={{ width: `${Math.min(100, (otHours / 60) * 100)}%`, background: otHours > 60 ? "var(--negative)" : "var(--warning)" }}
             />
           </div>
-        </div>
+
+          <div className="text-xs" style={{ color: "var(--text-muted)" }}>
+            Até 60h/mês: <span style={{ color: "var(--warning)" }}>+25%</span> · Acima de 60h: <span style={{ color: "var(--negative)" }}>+50%</span> — lei trabalhista japonesa
+          </div>
+
+          {otHoursHigh > 0 && (
+            <div className="mt-1.5 flex items-center justify-between rounded-lg px-2.5 py-1.5" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <div>
+                <div className="text-xs font-semibold" style={{ color: "var(--negative)" }}>⚡ Taxa elevada atingida</div>
+                <div className="text-xs" style={{ color: "var(--text-muted)" }}>{otHoursHigh.toFixed(1)}h a 50% em vez de 25%</div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-mono font-bold" style={{ color: "var(--negative)" }}>
+                  +{YEN(Math.round(otHoursHigh * (settings.hourlyRate || 0) * 0.25))}
+                </div>
+                <div className="text-xs" style={{ color: "var(--text-muted)" }}>bônus vs 25%</div>
+              </div>
+            </div>
+          )}
+
+          {otHours > 0 && otHours < 60 && (
+            <div className="mt-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+              Faltam <span style={{ color: "var(--warning)" }}>{(60 - otHours).toFixed(1)}h</span> para a taxa elevada
+              {settings.hourlyRate > 0 && (
+                <span> · potencial +{YEN(Math.round((60 - otHours) * (settings.hourlyRate || 0) * 0.25))} além desse limite</span>
+              )}
+            </div>
+          )}
+        </Card>
       )}
 
       {/* Yukyu */}
