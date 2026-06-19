@@ -80,7 +80,7 @@ export default function App() {
       >
         <div className="flex items-center gap-2">
           <span className="text-base">⛩️</span>
-          <span className="text-sm font-bold" style={{ color: "var(--text)" }}>Japan Salary Tracker</span>
+          <span className="text-sm font-bold" style={{ color: "var(--text)" }}>JapanFinance</span>
           <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--bg-elevated)", color: "var(--text-muted)", border: "1px solid var(--border-mid)" }}>v5</span>
         </div>
         <div className="flex items-center gap-2">
