@@ -2,57 +2,9 @@ name: Fix Core Salary Math
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/fix-core-salary-math.yml
-
-permissions:
-  contents: write
 
 jobs:
-  patch:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Patch calcDay salary formula
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('src/utils/calc.js')
-          s = p.read_text()
-          old = '''  if (isHoliday) {
-    holidayPay = totalHours * rate * rules.holidayRate;
-    normalPay = totalHours * rate;
-  } else {
-    normalPay = normalHours * rate;
-    overtimePay = (overtimeNormalMin / 60) * rate * rules.overtimeRate
-      + (overtimeHighMin / 60) * rate * (rules.overtimeHighRate || 0.5);
-  }
-'''
-          new = '''  if (isHoliday) {
-    normalPay = totalHours * rate;
-    holidayPay = totalHours * rate * rules.holidayRate;
-  } else {
-    // Base wage must be paid for every worked hour. OvertimePay is only the extra premium.
-    // Example: 9h45 at 1900/h = 9.75 * 1900, then add HE/night premiums.
-    normalPay = totalHours * rate;
-    overtimePay = (overtimeNormalMin / 60) * rate * rules.overtimeRate
-      + (overtimeHighMin / 60) * rate * (rules.overtimeHighRate || 0.5);
-  }
-'''
-          if old not in s:
-              raise SystemExit('Target salary formula block not found')
-          p.write_text(s.replace(old, new))
-          PY
-      - name: Commit patch
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email github-actions[bot]@users.noreply.github.com
-          git add src/utils/calc.js
-          if git diff --cached --quiet; then
-            echo "No changes needed"
-          else
-            git commit -m "Fix core salary math formula"
-            git push
-          fi
+      - run: echo disabled
