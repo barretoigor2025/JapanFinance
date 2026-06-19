@@ -15,7 +15,7 @@ export function CalcDetailModal({ entry, settings, onClose }) {
     calc.isHoliday && { label: "Feriado", value: formatMinutes(calc.totalMin), sub: "+35%" },
     { label: "divider" },
     { label: "Pagamento base", value: YEN(calc.normalPay), sub: `${calc.normalHours.toFixed(1)}h × ¥${settings.hourlyRate}` },
-    calc.overtimePay > 0 && { label: "Hora extra", value: YEN(calc.overtimePay), sub: `+${Math.round(calc.breakdown.rates.overtimeRate * 100)}%` },
+    calc.overtimePay > 0 && { label: "Hora extra", value: YEN(calc.overtimePay), sub: [calc.breakdown.overtimeNormal > 0 && `${calc.breakdown.overtimeNormal.toFixed(1)}h×${Math.round((1 + calc.breakdown.rates.overtimeRate) * 100)}%`, calc.breakdown.overtimeHigh > 0 && `${calc.breakdown.overtimeHigh.toFixed(1)}h×${Math.round((1 + calc.breakdown.rates.overtimeHighRate) * 100)}% (acima 60h)`].filter(Boolean).join(' + ') },
     calc.nightPay > 0 && { label: "Adicional noturno", value: YEN(calc.nightPay), sub: `+${Math.round(calc.breakdown.rates.nightRate * 100)}%` },
     calc.holidayPay > 0 && { label: "Adicional feriado", value: YEN(calc.holidayPay), sub: `+${Math.round(calc.breakdown.rates.holidayRate * 100)}%` },
     { label: "divider" },

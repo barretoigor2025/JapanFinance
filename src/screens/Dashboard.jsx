@@ -28,7 +28,7 @@ export function Dashboard({ entries, settings, onAddEntry }) {
   const otHours = calcs.reduce((a, c) => a + c.overtimeHours, 0);
   const grossSalary = calcs.reduce((a, c) => a + c.grossPay, 0);
   const totalTeate = (settings.teate || []).filter(t => t.active).reduce((a, t) => a + (t.amount || 0), 0);
-  const grossWithTeate = grossSalary + totalTeate;
+  const grossWithTeate = Math.round(grossSalary + totalTeate);
   const { netPay, totalDeductions } = estimateDeductions(grossWithTeate, settings);
 
   const workedDays = monthEntries.filter(e => e.dayType !== "yukyu").length;

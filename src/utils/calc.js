@@ -128,8 +128,9 @@ export function calcDay(entry, settings, monthlyOvertimeSoFar = 0) {
     normalPay = totalHours * rate;
   } else {
     normalPay = normalHours * rate;
-    overtimePay = (overtimeNormalMin / 60) * rate * rules.overtimeRate
-      + (overtimeHighMin / 60) * rate * (rules.overtimeHighRate || 0.5);
+    // 1 + rate: overtime hours are paid base + premium (e.g. 1.25x for 25% OT)
+    overtimePay = (overtimeNormalMin / 60) * rate * (1 + rules.overtimeRate)
+      + (overtimeHighMin / 60) * rate * (1 + (rules.overtimeHighRate || 0.5));
   }
 
   nightPay = nightHours * rate * rules.nightRate;
@@ -161,7 +162,7 @@ export function calcDay(entry, settings, monthlyOvertimeSoFar = 0) {
       overtimeHigh: overtimeHighMin / 60,
       nightHours,
       jpSaturdayIsAllOT,
-      rates: { overtimeRate: rules.overtimeRate, nightRate: rules.nightRate, holidayRate: rules.holidayRate },
+      rates: { overtimeRate: rules.overtimeRate, overtimeHighRate: rules.overtimeHighRate || 0.5, nightRate: rules.nightRate, holidayRate: rules.holidayRate },
     },
   };
 }

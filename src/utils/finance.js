@@ -26,9 +26,7 @@ export function sumSalaryMonth(entries = [], settings = {}, month) {
   });
   const totalHours = calcs.reduce((s, c) => s + c.totalHours, 0);
   const overtimeHours = calcs.reduce((s, c) => s + c.overtimeHours, 0);
-  const rate = settings.hourlyRate || 0;
-  // calcDay stores overtimePay as premium only. Add the base wage for overtime hours here.
-  const grossSalary = calcs.reduce((s, c) => s + c.grossPay, 0) + (overtimeHours * rate);
+  const grossSalary = calcs.reduce((s, c) => s + c.grossPay, 0);
   const taxableTeate = (settings.teate || []).filter(t => t.active).reduce((s, t) => s + (t.amount || 0), 0);
   const grossWithTeate = grossSalary + taxableTeate;
   const deduction = estimateDeductions(grossWithTeate, settings);
