@@ -1,0 +1,1498 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="description" content="Japanese Permanent Visa Eligibility Analyzer — análise estimada de elegibilidade ao visto permanente japonês com base nos requisitos oficiais da Imigração." />
+  <title>Japanese Permanent Visa Eligibility Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /*
+      Japanese Permanent Visa Eligibility Analyzer
+      -------------------------------------------------------------------
+      ESTILOS — interface mobile-first, layout em cards, tema escuro.
+      Toda a lógica de requisitos vive no bloco JS mais abaixo, separada
+      em: base de regras por categoria → questionário → motor de pontuação.
+    */
+    :root {
+      --bg:        #0a0a0a;
+      --bg-card:   #161616;
+      --bg-elev:   #1f1f1f;
+      --border:    #2a2a2a;
+      --border-mid:#383838;
+      --text:      #f4f4f5;
+      --text-sub:  #c4c4c8;
+      --text-muted:#8a8a90;
+      --accent:    #e11d48;   /* vermelho-japonês (hinomaru) */
+      --accent-2:  #be123c;
+      --positive:  #22c55e;
+      --warning:   #f59e0b;
+      --negative:  #ef4444;
+      --info:      #3b82f6;
+      --radius:    16px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans JP', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 16px 16px 64px; }
+
+    /* ---------- Cabeçalho fixo ---------- */
+    .topbar {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 16px;
+      background: rgba(10,10,10,0.82);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar .flag { font-size: 20px; }
+    .topbar h1 { font-size: 14px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+    .topbar .jp { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+    /* ---------- Cards ---------- */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .card h2 { font-size: 18px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.02em; }
+    .card p  { font-size: 14px; color: var(--text-sub); margin: 0 0 10px; }
+    .muted   { color: var(--text-muted); font-size: 13px; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: var(--bg-elev); border: 1px solid var(--border-mid);
+      padding: 4px 10px; border-radius: 999px;
+      margin-bottom: 12px;
+    }
+
+    /* ---------- Avisos ---------- */
+    .notice {
+      border-radius: 12px; padding: 12px 14px; font-size: 13px;
+      border: 1px solid; margin-bottom: 12px; line-height: 1.5;
+    }
+    .notice.warn   { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); color: #fcd34d; }
+    .notice.info   { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.3); color: #93c5fd; }
+
+    /* ---------- Botões ---------- */
+    .btn {
+      display: block; width: 100%; text-align: center;
+      font-family: inherit; font-size: 16px; font-weight: 700;
+      padding: 15px 18px; border-radius: 14px; border: none;
+      cursor: pointer; transition: transform .06s ease, filter .15s ease;
+    }
+    .btn:active { transform: scale(0.985); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.07); }
+    .btn-ghost {
+      background: var(--bg-elev); color: var(--text);
+      border: 1px solid var(--border-mid);
+    }
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { width: auto; flex: 1; }
+    .btn-sm { font-size: 14px; padding: 12px 14px; }
+
+    /* ---------- Barra de progresso ---------- */
+    .progress-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .progress-head .step { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    .progress-head .sect { font-size: 12px; color: var(--accent); font-weight: 700; }
+    .bar { height: 6px; border-radius: 999px; background: var(--bg-elev); overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s ease; }
+
+    /* ---------- Pergunta ---------- */
+    .qnum { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
+    .qtext { font-size: 19px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+    .qhint { font-size: 13px; color: var(--text-muted); margin: 0 0 16px; }
+
+    /* opções */
+    .opts { display: flex; flex-direction: column; gap: 10px; }
+    .opt {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; text-align: left; font-family: inherit;
+      background: var(--bg-elev); border: 1.5px solid var(--border-mid);
+      color: var(--text); border-radius: 13px; padding: 14px 16px;
+      font-size: 15px; font-weight: 500; cursor: pointer;
+      transition: border-color .12s ease, background .12s ease;
+    }
+    .opt:hover { border-color: var(--text-muted); }
+    .opt.sel { border-color: var(--accent); background: rgba(225,29,72,0.1); }
+    .opt .dot {
+      width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid var(--border-mid); position: relative;
+    }
+    .opt.sel .dot { border-color: var(--accent); }
+    .opt.sel .dot::after {
+      content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--accent);
+    }
+    .opt small { display: block; color: var(--text-muted); font-size: 12px; font-weight: 400; margin-top: 2px; }
+
+    /* input numérico */
+    .num-input {
+      width: 100%; font-family: inherit; font-size: 17px; font-weight: 600;
+      background: var(--bg-elev); border: 1.5px solid var(--border-mid);
+      color: var(--text); border-radius: 13px; padding: 14px 16px;
+      margin-bottom: 4px;
+    }
+    .num-input:focus { outline: none; border-color: var(--accent); }
+    .input-suffix { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+
+    /* navegação inferior */
+    .nav { display: flex; gap: 10px; margin-top: 20px; }
+    .nav .btn { flex: 1; }
+
+    /* ---------- Resultado ---------- */
+    .score-ring {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      width: 168px; height: 168px; border-radius: 50%; margin: 4px auto 16px;
+      position: relative;
+    }
+    .score-ring .pct { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    .score-ring .lbl { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    .verdict {
+      text-align: center; font-size: 17px; font-weight: 700;
+      padding: 12px; border-radius: 12px; margin-bottom: 6px;
+    }
+    .verdict small { display: block; font-weight: 500; font-size: 13px; margin-top: 4px; opacity: .85; }
+
+    .list { list-style: none; padding: 0; margin: 0; }
+    .list li {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+    }
+    .list li:last-child { border-bottom: none; }
+    .list li .ic { flex-shrink: 0; font-size: 15px; line-height: 1.4; }
+    .list li .tx { color: var(--text-sub); }
+    .list li .tx b { color: var(--text); font-weight: 600; }
+    .list li.ok .tx b   { color: var(--positive); }
+    .list li.warn .tx b { color: var(--warning); }
+    .list li.bad .tx b  { color: var(--negative); }
+
+    .doc-list li { color: var(--text-sub); }
+
+    .sect-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--text-muted); margin: 0 0 4px;
+    }
+
+    .weight-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .weight-row:last-child { border-bottom: none; }
+    .weight-row .wbar { flex: 1; height: 5px; margin: 0 10px; background: var(--bg-elev); border-radius: 999px; overflow: hidden; }
+    .weight-row .wbar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+    /* rodapé legal */
+    .legal {
+      font-size: 11px; color: var(--text-muted); line-height: 1.6;
+      border-top: 1px solid var(--border); padding-top: 16px; margin-top: 8px;
+    }
+    .legal b { color: var(--text-sub); }
+    .legal a { color: var(--info); text-decoration: none; }
+
+    /* ---------- Documentos detalhados ---------- */
+    .doc-group { margin-bottom: 18px; }
+    .doc-group:last-child { margin-bottom: 0; }
+    .doc-group-h {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.01em;
+    }
+    .doc-group-sub { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; }
+
+    .doc {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 13px 14px;
+      margin-bottom: 10px;
+    }
+    .doc:last-child { margin-bottom: 0; }
+    .doc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .doc-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.35; }
+    .doc-name .jp { display: block; font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 1px; }
+    .doc-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+
+    /* etiqueta de ONDE conseguir, com cor por instituição */
+    .where {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 8px;
+      border: 1px solid;
+    }
+    .where.city   { background: rgba(59,130,246,0.12);  color: #93c5fd; border-color: rgba(59,130,246,0.35); }   /* 市区町村 */
+    .where.tax    { background: rgba(168,85,247,0.12);  color: #d8b4fe; border-color: rgba(168,85,247,0.35); }   /* 税務署 */
+    .where.pension{ background: rgba(20,184,166,0.12);  color: #5eead4; border-color: rgba(20,184,166,0.35); }   /* 年金 */
+    .where.isa    { background: rgba(225,29,72,0.12);   color: #fda4af; border-color: rgba(225,29,72,0.35); }    /* imigração */
+    .where.self   { background: rgba(245,158,11,0.12);  color: #fcd34d; border-color: rgba(245,158,11,0.35); }   /* próprio */
+    .where.work   { background: rgba(34,197,94,0.12);   color: #86efac; border-color: rgba(34,197,94,0.35); }    /* empregador */
+    .where.home   { background: rgba(138,138,144,0.15); color: #c4c4c8; border-color: rgba(138,138,144,0.4); }   /* país de origem */
+
+    .yr {
+      display: inline-flex; align-items: center;
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      background: var(--bg-card); border: 1px solid var(--border-mid);
+      padding: 4px 9px; border-radius: 8px;
+    }
+    .doc-note { font-size: 12px; color: var(--text-muted); margin-top: 9px; line-height: 1.5; }
+    .doc-note b { color: var(--text-sub); }
+
+    /* botão de download ao lado do texto (texto NÃO é link) */
+    .dl {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: inherit; font-size: 11px; font-weight: 700;
+      text-decoration: none; white-space: nowrap;
+      background: var(--accent); color: #fff;
+      padding: 6px 11px; border-radius: 9px; border: none; cursor: pointer;
+      transition: filter .12s ease;
+    }
+    .dl:hover { filter: brightness(1.1); }
+    .dl.alt { background: var(--bg-card); color: var(--text-sub); border: 1px solid var(--border-mid); }
+    .dl-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+
+    /* legenda de instituições */
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+    .legend .where { cursor: default; }
+
+    .callout {
+      border-left: 3px solid var(--accent);
+      background: rgba(225,29,72,0.06);
+      border-radius: 0 10px 10px 0;
+      padding: 11px 13px; font-size: 12.5px; line-height: 1.55;
+      color: var(--text-sub); margin: 12px 0;
+    }
+    .callout b { color: var(--text); }
+
+    .hide { display: none !important; }
+    .fade { animation: fade .25s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .cat-badge {
+      display: inline-block; font-size: 12px; font-weight: 700;
+      background: rgba(225,29,72,0.12); color: #fda4af;
+      border: 1px solid rgba(225,29,72,0.3);
+      padding: 4px 12px; border-radius: 999px; margin-bottom: 10px;
+    }
+    .back-link { font-size: 13px; color: var(--text-muted); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <span class="flag">🗾</span>
+    <div>
+      <h1>Permanent Visa Eligibility Analyzer</h1>
+      <div class="jp">永住許可 · 適合度の目安チェック</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- ============================================================= -->
+    <!-- TELA 1 — INÍCIO                                                -->
+    <!-- ============================================================= -->
+    <section id="screen-intro">
+      <div class="card">
+        <span class="pill">🗾 Imigração do Japão</span>
+        <h2>Japanese Permanent Visa Eligibility Analyzer</h2>
+        <p>
+          Esta ferramenta ajuda a verificar se você cumpre os principais requisitos
+          para solicitar o visto permanente japonês (<b>永住者 / Permanent Resident</b>),
+          com base nas informações oficiais da Imigração Japonesa.
+        </p>
+        <div class="notice warn">
+          ⚠️ Esta análise <b>não substitui</b> consulta com advogado, despachante
+          administrativo (<b>行政書士 / gyoseishoshi</b>) ou a decisão oficial da
+          Imigração Japonesa. É apenas uma estimativa baseada em requisitos públicos.
+        </div>
+        <div class="notice info">
+          🔒 Suas respostas ficam <b>somente no seu navegador</b>. Nada é enviado
+          para nenhum servidor. Não pedimos dados pessoais como endereço, telefone
+          ou número de documento.
+        </div>
+        <button class="btn btn-primary" onclick="App.start()">Iniciar questionário →</button>
+      </div>
+
+      <div class="card">
+        <div class="sect-title">O que será avaliado</div>
+        <ul class="list">
+          <li class="ok"><span class="ic">📅</span><span class="tx"><b>Tempo de residência</b> contínua no Japão (varia por categoria)</span></li>
+          <li class="ok"><span class="ic">🧾</span><span class="tx"><b>Pagamento em dia</b> de impostos, pensão (年金) e seguro saúde</span></li>
+          <li class="ok"><span class="ic">💴</span><span class="tx"><b>Independência financeira</b> e estabilidade de renda</span></li>
+          <li class="ok"><span class="ic">⚖️</span><span class="tx"><b>Boa conduta</b> e ausência de problemas legais graves</span></li>
+          <li class="ok"><span class="ic">🪪</span><span class="tx"><b>Prazo do visto atual</b> (o mais longo previsto para o status)</span></li>
+        </ul>
+      </div>
+
+      <div class="legal">
+        <b>Aviso legal:</b> Esta ferramenta oferece apenas uma estimativa baseada em
+        requisitos públicos da Imigração Japonesa. Ela não garante aprovação do visto
+        permanente. A decisão final pertence à <b>Immigration Services Agency of Japan
+        (出入国在留管理庁)</b>. Para casos específicos, consulte um advogado, gyoseishoshi
+        ou especialista em imigração.<br><br>
+        Fontes oficiais: Immigration Services Agency of Japan —
+        “Permission for permanent residence (Immigration Control Act, Article 22)” e
+        “永住許可に関するガイドライン” (revisão de 令和8年/2026).
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TELA 2 — QUESTIONÁRIO                                          -->
+    <!-- ============================================================= -->
+    <section id="screen-quiz" class="hide">
+      <div class="progress-head">
+        <span class="step" id="q-step">Pergunta 1</span>
+        <span class="sect" id="q-sect">Categoria</span>
+      </div>
+      <div class="bar"><i id="q-bar" style="width:0%"></i></div>
+
+      <div class="card fade" id="q-card" style="margin-top:14px;">
+        <!-- preenchido por JS -->
+      </div>
+
+      <div class="nav">
+        <button class="btn btn-ghost" id="q-back" onclick="App.back()">← Voltar</button>
+        <button class="btn btn-primary" id="q-next" onclick="App.next()">Próxima →</button>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- TELA 3 — RESULTADO                                             -->
+    <!-- ============================================================= -->
+    <section id="screen-result" class="hide">
+      <!-- preenchido por JS -->
+    </section>
+
+  </div>
+
+  <script>
+  /* ===================================================================
+     BASE DE REQUISITOS POR CATEGORIA  (fonte: Imigração do Japão / ISA)
+     -------------------------------------------------------------------
+     永住許可に関するガイドライン — requisitos legais (Art. 22 da Lei de
+     Controle de Imigração). Resumo das regras usadas no motor:
+
+     3 requisitos legais:
+       (1) 素行善良  — boa conduta
+       (2) 独立生計  — independência de subsistência (recursos/renda)
+       (3) 国益適合  — residência em conformidade com o interesse do Japão:
+            • em princípio 10 anos contínuos no Japão, sendo ao menos
+              5 anos com status de trabalho ou de residência
+              (exclui 技能実習 e 特定技能1号);
+            • sem multas/penas; impostos, pensão e seguro saúde pagos
+              EM DIA (atraso dentro do prazo original é avaliado de
+              forma negativa, mesmo que quitado depois);
+            • estar no MAIOR prazo de permanência previsto para o status
+              atual (別表第2);
+
+     ESPECIAIS (reduzem o tempo de 10 anos):
+       • Cônjuge de japonês/permanente/permanente especial:
+            casamento ≥ 3 anos contínuos E ≥ 1 ano de residência no Japão.
+       • Filho(a) real de japonês/permanente: ≥ 1 ano de residência.
+       • 定住者 (Long-Term Resident): ≥ 5 anos contínuos após obter o status.
+       • Refugiado reconhecido: ≥ 5 anos contínuos.
+       • Highly Skilled Professional (高度専門職) 70 pontos: ≥ 3 anos.
+       • Highly Skilled Professional 80 pontos / 特別高度人材: ≥ 1 ano.
+
+     ISENÇÕES: cônjuge ou filho de japonês/permanente NÃO precisa cumprir
+     (1) boa conduta e (2) independência de subsistência como requisito
+     formal — mas estabilidade familiar e renda do núcleo seguem avaliadas.
+     =================================================================== */
+
+  const CATEGORIES = {
+    spouse_jp: {
+      label: "Cônjuge de japonês",
+      jp: "日本人の配偶者",
+      // regra especial: casamento >=3 anos E residência >=1 ano
+      residenceYears: 1,
+      marriageYears: 3,
+      exemptConductFinance: true,   // (1) e (2) dispensados como requisito formal
+      note: "Casado(a) com cidadão japonês há 3+ anos e residente há 1+ ano."
+    },
+    spouse_pr: {
+      label: "Cônjuge de residente permanente",
+      jp: "永住者の配偶者",
+      residenceYears: 1,
+      marriageYears: 3,
+      exemptConductFinance: true,
+      note: "Mesma regra do cônjuge de japonês: casamento 3+ anos e residência 1+ ano."
+    },
+    child_jp: {
+      label: "Filho(a) de japonês",
+      jp: "日本人の実子",
+      residenceYears: 1,
+      marriageYears: 0,
+      exemptConductFinance: true,
+      note: "Filho(a) real de cidadão japonês, residente há 1+ ano."
+    },
+    child_pr: {
+      label: "Filho(a) de residente permanente",
+      jp: "永住者の実子",
+      residenceYears: 1,
+      marriageYears: 0,
+      exemptConductFinance: true,
+      note: "Filho(a) real de residente permanente, residente há 1+ ano."
+    },
+    long_term: {
+      label: "Long-Term Resident / 定住者",
+      jp: "定住者",
+      residenceYears: 5,             // 5 anos APÓS obter o status 定住者
+      statusYears: 5,
+      marriageYears: 0,
+      exemptConductFinance: false,
+      note: "Residência de 5+ anos contínuos após obter o status de 定住者."
+    },
+    hsp80: {
+      label: "Highly Skilled Professional — 80 pontos",
+      jp: "高度専門職（80点）",
+      residenceYears: 1,
+      marriageYears: 0,
+      exemptConductFinance: false,
+      note: "Profissional altamente qualificado com 80+ pontos: 1+ ano de residência."
+    },
+    hsp70: {
+      label: "Highly Skilled Professional — 70 pontos",
+      jp: "高度専門職（70点）",
+      residenceYears: 3,
+      marriageYears: 0,
+      exemptConductFinance: false,
+      note: "Profissional altamente qualificado com 70+ pontos: 3+ anos de residência."
+    },
+    work: {
+      label: "Visto de trabalho",
+      jp: "就労資格",
+      residenceYears: 10,            // regra geral: 10 anos
+      workYears: 5,                  // dos quais 5 com status de trabalho/residência
+      marriageYears: 0,
+      exemptConductFinance: false,
+      note: "Regra geral: 10 anos no Japão, sendo 5+ com status de trabalho."
+    },
+    other: {
+      label: "Outro status",
+      jp: "その他",
+      residenceYears: 10,
+      workYears: 5,
+      marriageYears: 0,
+      exemptConductFinance: false,
+      note: "Aplica-se a regra geral de 10 anos contínuos no Japão."
+    }
+  };
+
+  /* -------------------------------------------------------------------
+     QUESTIONÁRIO
+     Cada pergunta tem: id, seção, texto, tipo (choice|number), opções e
+     uma função showIf opcional (perguntas condicionais à categoria).
+     ------------------------------------------------------------------- */
+  const QUESTIONS = [
+    {
+      id: "category", section: "Categoria",
+      text: "Qual é o seu status de residência atual no Japão?",
+      hint: "Os requisitos do visto permanente mudam conforme a sua categoria.",
+      type: "choice",
+      options: [
+        { v: "spouse_jp",  t: "Cônjuge de japonês", s: "日本人の配偶者" },
+        { v: "spouse_pr",  t: "Cônjuge de residente permanente", s: "永住者の配偶者" },
+        { v: "child_jp",   t: "Filho(a) de japonês", s: "日本人の実子" },
+        { v: "child_pr",   t: "Filho(a) de residente permanente", s: "永住者の実子" },
+        { v: "long_term",  t: "Long-Term Resident", s: "定住者" },
+        { v: "hsp80",      t: "Highly Skilled Professional — 80 pts", s: "高度専門職 80点" },
+        { v: "hsp70",      t: "Highly Skilled Professional — 70 pts", s: "高度専門職 70点" },
+        { v: "work",       t: "Visto de trabalho", s: "就労ビザ" },
+        { v: "other",      t: "Outro", s: "その他" }
+      ]
+    },
+    {
+      id: "yearsInJapan", section: "Residência",
+      text: "Há quantos anos você mora no Japão de forma contínua?",
+      hint: "Conte o tempo total de residência sem interrupções longas.",
+      type: "number", suffix: "anos no Japão", min: 0, max: 60
+    },
+    {
+      id: "yearsStatus", section: "Residência",
+      text: "Há quanto tempo possui o status de residência atual?",
+      hint: "Para visto de trabalho, são exigidos 5+ anos com status de trabalho/residência.",
+      type: "number", suffix: "anos no status atual", min: 0, max: 60
+    },
+    {
+      id: "visaPeriod", section: "Visto atual",
+      text: "Qual é o prazo atual do seu visto?",
+      hint: "É exigido estar no MAIOR prazo previsto para o seu status (ex.: 3 ou 5 anos).",
+      type: "choice",
+      options: [
+        { v: "1", t: "1 ano" },
+        { v: "3", t: "3 anos" },
+        { v: "5", t: "5 anos" },
+        { v: "other", t: "Outro / não sei" }
+      ]
+    },
+    {
+      id: "marriageYears", section: "Família",
+      text: "Há quanto tempo você está casado(a)?",
+      hint: "Para cônjuges, exige-se 3+ anos de casamento contínuo.",
+      type: "number", suffix: "anos de casamento", min: 0, max: 60,
+      showIf: (a) => ["spouse_jp", "spouse_pr"].includes(a.category)
+    },
+    {
+      id: "livingTogether", section: "Família",
+      text: "Você mora junto com o cônjuge?",
+      hint: "A coabitação é avaliada como prova de estabilidade familiar.",
+      type: "choice",
+      options: [ { v: "yes", t: "Sim, moramos juntos" }, { v: "no", t: "Não moramos juntos" } ],
+      showIf: (a) => ["spouse_jp", "spouse_pr"].includes(a.category)
+    },
+    {
+      id: "income", section: "Finanças",
+      text: "Qual é a sua renda anual aproximada?",
+      hint: "Como referência prática, despachantes citam cerca de ¥3.000.000/ano como base mínima para vistos de trabalho (não é número oficial fixo).",
+      type: "choice",
+      options: [
+        { v: "lt2",  t: "Menos de ¥2.000.000" },
+        { v: "2to3", t: "¥2.000.000 – ¥3.000.000" },
+        { v: "3to4", t: "¥3.000.000 – ¥4.000.000" },
+        { v: "4to6", t: "¥4.000.000 – ¥6.000.000" },
+        { v: "gt6",  t: "Mais de ¥6.000.000" }
+      ]
+    },
+    {
+      id: "dependents", section: "Finanças",
+      text: "Quantos dependentes (扶養) você sustenta?",
+      hint: "Quanto mais dependentes, maior a renda esperada para comprovar independência.",
+      type: "number", suffix: "dependentes", min: 0, max: 15
+    },
+    {
+      id: "stableJob", section: "Finanças",
+      text: "Você possui emprego ou fonte de renda estável?",
+      hint: "Estabilidade e continuidade da renda pesam mais do que o valor pontual.",
+      type: "choice",
+      options: [
+        { v: "yes",   t: "Sim, estável e contínua" },
+        { v: "partly", t: "Parcialmente / temporária" },
+        { v: "no",    t: "Não tenho renda estável" }
+      ]
+    },
+    {
+      id: "insurance", section: "Obrigações públicas",
+      text: "Você está inscrito no seguro saúde e pensão?",
+      hint: "Shakai Hoken (社会保険) ou Kokumin Kenko Hoken + Kokumin Nenkin.",
+      type: "choice",
+      options: [
+        { v: "shakai", t: "Sim — Shakai Hoken (社会保険)" },
+        { v: "kokumin", t: "Sim — Kokumin Hoken + Nenkin" },
+        { v: "partial", t: "Apenas seguro saúde, sem pensão" },
+        { v: "no", t: "Não estou inscrito" }
+      ]
+    },
+    {
+      id: "paymentsOnTime", section: "Obrigações públicas",
+      text: "Você paga em dia imposto municipal, imposto de renda, seguro saúde e pensão?",
+      hint: "A Imigração avalia o pagamento DENTRO DO PRAZO. Pagar atrasado conta negativamente, mesmo que quitado depois.",
+      type: "choice",
+      options: [
+        { v: "all_ontime", t: "Sim, tudo sempre em dia" },
+        { v: "minor_late", t: "Houve pequenos atrasos, já quitados" },
+        { v: "recent_late", t: "Tive atrasos recentes (últimos 1–2 anos)" },
+        { v: "unpaid", t: "Tenho valores em aberto" }
+      ]
+    },
+    {
+      id: "pensionRecord", section: "Obrigações públicas",
+      text: "Sua pensão (年金 / Nenkin) está paga corretamente nos últimos 2 anos?",
+      hint: "O histórico de pagamento da pensão é especificamente verificado.",
+      type: "choice",
+      options: [
+        { v: "yes", t: "Sim, em dia" },
+        { v: "late", t: "Com alguns atrasos" },
+        { v: "no", t: "Não / não sei" }
+      ]
+    },
+    {
+      id: "criminal", section: "Conduta",
+      text: "Você possui antecedentes criminais ou já recebeu pena/multa grave no Japão?",
+      hint: "Penas de prisão ou multas comprometem o requisito de boa conduta (素行善良).",
+      type: "choice",
+      options: [
+        { v: "none", t: "Não, ficha limpa" },
+        { v: "minor", t: "Apenas infrações leves (ex.: trânsito)" },
+        { v: "serious", t: "Sim, pena ou multa grave" }
+      ]
+    },
+    {
+      id: "guarantor", section: "Documentação",
+      text: "Você possui um fiador/garantidor (身元保証人) no Japão?",
+      hint: "Exige-se um garantidor que seja japonês ou residente permanente.",
+      type: "choice",
+      options: [
+        { v: "yes", t: "Sim, tenho garantidor" },
+        { v: "no", t: "Ainda não tenho" }
+      ]
+    },
+    {
+      id: "japanese", section: "Complementar",
+      text: "Você tem conhecimento básico de japonês?",
+      hint: "Observação: não é um requisito formal geral. Conta apenas como informação complementar, não decisiva.",
+      type: "choice",
+      options: [
+        { v: "yes", t: "Sim, comunico-me bem" },
+        { v: "basic", t: "Básico do dia a dia" },
+        { v: "no", t: "Quase nenhum" }
+      ]
+    }
+  ];
+
+  /* ===================================================================
+     BASE DE DOCUMENTOS  (fonte: 出入国在留管理庁 / ISA — 永住許可申請)
+     -------------------------------------------------------------------
+     Foco do usuário: deixar MUITO claro ONDE cada documento é obtido,
+     porque vários têm nomes parecidos mas vêm de órgãos diferentes e
+     com pesos diferentes na análise. Os formulários oficiais ganham um
+     botão de download (link direto para o PDF/Excel no site da ISA).
+
+     Distinção crítica (o caso clássico de confusão):
+       • 納税証明書 da PREFEITURA  → prova que o imposto MUNICIPAL/residente
+         (住民税) foi pago. Sai no 市区町村役場.
+       • 納税証明書（その３）do TÉQUE/RECEITA → prova que os impostos
+         NACIONAIS (imposto de renda etc.) não têm débito. Sai no 税務署.
+       Os dois têm o mesmo "nome de família" (納税証明書) mas NÃO são a
+       mesma coisa e ambos costumam ser exigidos.
+
+     Onde se obtém (etiquetas de cor no resultado):
+       city = 市区町村役場 (prefeitura) · tax = 税務署 (receita nacional)
+       pension = 年金事務所/日本年金機構 · isa = Imigração (download)
+       self = você mesmo guarda/copia · work = empregador · home = país de origem
+     =================================================================== */
+
+  const ISA = "https://www.moj.go.jp/isa/content/";   // base dos PDFs oficiais
+  const PROC_URL = "https://www.moj.go.jp/isa/applications/procedures/zairyu_eijyu01.html";
+
+  // Legenda das instituições (onde conseguir)
+  const INSTITUTIONS = [
+    { k: "city",    icon: "🏛️", t: "Prefeitura — 市区町村役場" },
+    { k: "tax",     icon: "🧾", t: "Receita Nacional — 税務署" },
+    { k: "pension", icon: "📒", t: "Pensão — 年金事務所 / 日本年金機構" },
+    { k: "isa",     icon: "🗾", t: "Imigração — baixar formulário" },
+    { k: "work",    icon: "🏢", t: "Empregador — 勤務先" },
+    { k: "self",    icon: "📂", t: "Você mesmo (cópia/guardado)" },
+    { k: "home",    icon: "🌐", t: "País de origem" }
+  ];
+
+  /* Documentos organizados por grupo. Cada doc:
+     { name, jp, where, years, note, dl:[{label,url,alt}] } */
+  const DOC_GROUPS = [
+    {
+      id: "forms",
+      title: "📋 Formulários oficiais da Imigração",
+      sub: "Baixe, imprima em A4 (um lado por folha) e preencha. Versões em português quando disponíveis.",
+      docs: [
+        {
+          name: "Formulário de pedido de permanência",
+          jp: "永住許可申請書（別記第34号様式）",
+          where: "isa", years: "1 via",
+          note: "Formulário principal do pedido. Há <b>exemplo de preenchimento</b> oficial.",
+          dl: [
+            { label: "PDF", url: ISA + "930002835.pdf" },
+            { label: "Excel", url: ISA + "930002836.xls", alt: true },
+            { label: "Exemplo", url: ISA + "001459537.pdf", alt: true }
+          ]
+        },
+        {
+          name: "Termo de consentimento (公的義務)",
+          jp: "了解書",
+          where: "isa", years: "1 via",
+          note: "Obrigatório desde 2021. Você <b>declara estar ciente</b> de que impostos, pensão e seguro saúde devem estar em dia — e que o permanente pode ser <b>cancelado</b> se não cumprir. É o documento que toca diretamente no seu histórico de pagamentos.",
+          dl: [
+            { label: "Português", url: ISA + "001356131.pdf" },
+            { label: "日本語", url: ISA + "001355579.pdf", alt: true },
+            { label: "English", url: ISA + "001356126.pdf", alt: true }
+          ]
+        },
+        {
+          name: "Carta de garantia do fiador",
+          jp: "身元保証書",
+          where: "isa", years: "1 via",
+          note: "Preenchida pelo seu garantidor (japonês ou residente permanente).",
+          dl: [
+            { label: "日本語", url: ISA + "930002536.pdf" },
+            { label: "English", url: ISA + "930002537.pdf", alt: true }
+          ]
+        },
+        {
+          name: "Lista de familiares",
+          jp: "親族一覧表",
+          where: "isa", years: "1 via",
+          note: "Relação de parentes (no Japão e no exterior).",
+          dl: [ { label: "PDF", url: ISA + "001427085.pdf" } ]
+        },
+        {
+          name: "Folha de autoverificação / checklist",
+          jp: "セルフチェックシート",
+          where: "isa", years: "—",
+          note: "Checklist oficial para conferir se não falta nada antes de protocolar.",
+          dl: [ { label: "Excel", url: ISA + "001428358.xlsx" } ]
+        },
+        {
+          name: "Carta de motivos do pedido",
+          jp: "理由書",
+          where: "self", years: "1 via",
+          note: "Texto livre explicando por que você merece o permanente. Não há formulário fixo; escreva e anexe.",
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "city",
+      title: "🏛️ Na Prefeitura (市区町村役場)",
+      sub: "Documentos emitidos pela cidade/distrito onde você mora.",
+      docs: [
+        {
+          name: "Atestado de residência (com todos da casa)",
+          jp: "住民票（世帯全員・省略なし）",
+          where: "city", years: "≤ 3 meses",
+          note: "Peça a versão <b>com todos os membros da família</b> e sem omissões (マイナンバー não precisa).",
+          dl: []
+        },
+        {
+          name: "Certificado de TRIBUTAÇÃO do imposto residente",
+          jp: "（住民税）課税証明書 / 非課税証明書",
+          where: "city", yearsKey: "taxYears",
+          note: "Mostra <b>quanto você ganhou</b> e o imposto municipal lançado. Prova de RENDA.",
+          dl: []
+        },
+        {
+          name: "Certificado de PAGAMENTO do imposto residente",
+          jp: "（住民税）納税証明書",
+          where: "city", yearsKey: "taxYears",
+          note: "⚠️ <b>Não confundir</b> com o do 税務署. Este prova que o imposto MUNICIPAL/residente (住民税) foi <b>pago em dia</b>. Sai na prefeitura.",
+          dl: []
+        },
+        {
+          name: "Certidão da família japonesa (se cônjuge/filho)",
+          jp: "戸籍謄本",
+          where: "city", years: "1 via",
+          note: "Do cônjuge/pai japonês. Comprova o vínculo familiar.",
+          catOnly: ["spouse_jp", "child_jp"],
+          dl: []
+        },
+        {
+          name: "Comprovante de pagamento do seguro saúde nacional",
+          jp: "国民健康保険料（税）納付証明書",
+          where: "city", years: "2 anos",
+          note: "Só para quem usa <b>Kokumin Kenko Hoken</b> (autônomos/sem Shakai Hoken).",
+          insuranceOnly: ["kokumin", "partial", "no"],
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "tax",
+      title: "🧾 Na Receita Nacional (税務署)",
+      sub: "Impostos NACIONAIS — fonte diferente da prefeitura, com peso próprio na análise.",
+      docs: [
+        {
+          name: "Certificado de pagamento de impostos nacionais (tipo 3)",
+          jp: "納税証明書（その３）",
+          where: "tax", yearsKey: "taxYears",
+          note: "⚠️ <b>Mesmo nome “納税証明書”, mas é OUTRO documento.</b> O “その３” prova que você <b>não tem débito</b> de imposto de renda, consumo etc. junto à Receita Nacional. Tire no 税務署 da sua área (ou pelo e-Tax). Diferente do 納税証明書 da prefeitura, que é do imposto municipal.",
+          dl: []
+        },
+        {
+          name: "Cópia da declaração de imposto (autônomos)",
+          jp: "確定申告書の控え",
+          where: "self", years: "3 anos",
+          note: "Se você é autônomo/empresário, guarde as cópias carimbadas das declarações.",
+          jobOnly: true,
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "pension",
+      title: "📒 Pensão (年金事務所 / 日本年金機構)",
+      sub: "O histórico da pensão é verificado especificamente — pagamento EM DIA importa.",
+      docs: [
+        {
+          name: "Extrato de contribuição / registro de segurado",
+          jp: "被保険者記録照会（回答票） / ねんきん定期便",
+          where: "pension", years: "2 anos",
+          note: "Mostra os meses pagos. Dá para tirar no <b>年金事務所</b> ou imprimir pelo <b>ねんきんネット</b> (online).",
+          dl: [ { label: "ねんきんネット", url: "https://www.nenkin.go.jp/n_net/", alt: true } ]
+        },
+        {
+          name: "Certificado de pagamento de contribuições sociais",
+          jp: "社会保険料納入証明書",
+          where: "pension", years: "2 anos",
+          note: "Para quem tem <b>Shakai Hoken (厚生年金)</b> pela empresa.",
+          insuranceOnly: ["shakai"],
+          dl: []
+        },
+        {
+          name: "Recibos da pensão nacional",
+          jp: "国民年金保険料 領収証書（控え）",
+          where: "self", years: "2 anos",
+          note: "Para quem paga <b>Kokumin Nenkin</b>: guarde/copie os recibos dos últimos 24 meses.",
+          insuranceOnly: ["kokumin", "partial", "no"],
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "insurance",
+      title: "💊 Seguro saúde",
+      sub: "Cópias do que comprova que você está coberto e em dia.",
+      docs: [
+        {
+          name: "Cópia da carteira do seguro saúde",
+          jp: "健康保険被保険者証 / マイナ保険証情報",
+          where: "self", years: "atual",
+          note: "Frente e verso. Se usa a Mynaカード como cartão de saúde, imprima a tela de informações.",
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "income",
+      title: "💴 Renda e emprego",
+      sub: "Comprova estabilidade financeira — leia o bloco de renda acima com atenção.",
+      docs: [
+        {
+          name: "Atestado de emprego",
+          jp: "在職証明書",
+          where: "work", years: "atual",
+          note: "Pedido ao RH/empregador. Confirma vínculo e cargo.",
+          dl: []
+        },
+        {
+          name: "Comprovante de retenção / holerites",
+          jp: "源泉徴収票 / 給与明細",
+          where: "self", years: "1–3 anos",
+          note: "O <b>源泉徴収票</b> (anual) vem do empregador; guarde também os holerites recentes.",
+          dl: []
+        },
+        {
+          name: "Cópia da caderneta bancária / saldo",
+          jp: "預貯金通帳の写し",
+          where: "self", years: "—",
+          note: "Reforça a comprovação de reservas (opcional, mas ajuda).",
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "guarantor",
+      title: "🤝 Documentos do garantidor (身元保証人)",
+      sub: "Além da carta de garantia, o fiador anexa os documentos dele.",
+      docs: [
+        {
+          name: "Atestado de residência do fiador",
+          jp: "身元保証人の住民票",
+          where: "city", years: "≤ 3 meses",
+          note: "Tirado pelo próprio garantidor na prefeitura dele.",
+          dl: []
+        },
+        {
+          name: "Comprovante de profissão e renda do fiador",
+          jp: "在職証明書・課税（所得）証明書",
+          where: "city", years: "1 ano",
+          note: "Comprova que o fiador tem condições. Renda dele = prefeitura; emprego = empregador.",
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "family",
+      title: "👨‍👩‍👧 Vínculo familiar (categoria específica)",
+      sub: "Só aparece conforme a sua categoria.",
+      docs: [
+        {
+          name: "Certidão de casamento do país de origem",
+          jp: "婚姻証明書",
+          where: "home", years: "1 via",
+          note: "Para cônjuges. Pode exigir tradução para o japonês.",
+          catOnly: ["spouse_jp", "spouse_pr"],
+          dl: []
+        },
+        {
+          name: "Questionário do cônjuge",
+          jp: "質問書",
+          where: "self", years: "1 via",
+          note: "Para cônjuge de japonês: descreve como se conheceram, histórico do casamento etc.",
+          catOnly: ["spouse_jp"],
+          dl: []
+        },
+        {
+          name: "Certidão de nascimento / vínculo",
+          jp: "出生証明書",
+          where: "home", years: "1 via",
+          note: "Para filhos: comprova a filiação com o japonês/residente permanente.",
+          catOnly: ["child_jp", "child_pr"],
+          dl: []
+        }
+      ]
+    },
+    {
+      id: "id",
+      title: "🪪 Identificação (apresentar)",
+      sub: "Levar no balcão; cópias quando pedido.",
+      docs: [
+        { name: "Passaporte", jp: "パスポート", where: "self", years: "apresentar", note: "Apresentação no protocolo.", dl: [] },
+        { name: "Cartão de residência", jp: "在留カード", where: "self", years: "apresentar", note: "Apresentação no protocolo.", dl: [] },
+        { name: "Foto 4×3 cm", jp: "写真 4cm×3cm", where: "self", years: "1 foto", note: "Recente (≤ 3 meses), fundo liso.", dl: [] }
+      ]
+    }
+  ];
+
+  /* ===================================================================
+     MOTOR DE PONTUAÇÃO
+     -------------------------------------------------------------------
+     Cada critério liga-se a um requisito REAL e tem um peso. O peso
+     total possível depende da categoria (cônjuges/filhos têm os
+     requisitos de conduta/finanças DISPENSADOS como formais, então
+     esses pesos são reduzidos — não zerados, pois ainda são avaliados).
+     A nota final = pontos obtidos / pontos máximos aplicáveis.
+     =================================================================== */
+
+  const App = {
+    answers: {},
+    order: [],     // perguntas visíveis na ordem atual
+    idx: 0,
+
+    start() {
+      this.answers = {};
+      this.idx = 0;
+      this.rebuildOrder();
+      show("screen-intro", false);
+      show("screen-result", false);
+      show("screen-quiz", true);
+      this.render();
+      window.scrollTo(0, 0);
+    },
+
+    // recalcula quais perguntas aparecem (condicionais dependem das respostas)
+    rebuildOrder() {
+      this.order = QUESTIONS.filter(q => !q.showIf || q.showIf(this.answers));
+    },
+
+    current() { return this.order[this.idx]; },
+
+    render() {
+      this.rebuildOrder();
+      if (this.idx >= this.order.length) this.idx = this.order.length - 1;
+      const q = this.current();
+      const total = this.order.length;
+      const pct = Math.round(((this.idx) / total) * 100);
+
+      document.getElementById("q-step").textContent = `Pergunta ${this.idx + 1} de ${total}`;
+      document.getElementById("q-sect").textContent = q.section;
+      document.getElementById("q-bar").style.width = pct + "%";
+      document.getElementById("q-back").disabled = this.idx === 0;
+      document.getElementById("q-back").style.opacity = this.idx === 0 ? .4 : 1;
+
+      const last = this.idx === total - 1;
+      document.getElementById("q-next").textContent = last ? "Ver resultado ✓" : "Próxima →";
+
+      const card = document.getElementById("q-card");
+      card.classList.remove("fade"); void card.offsetWidth; card.classList.add("fade");
+
+      let html = `<div class="qnum">${q.section.toUpperCase()}</div>
+        <div class="qtext">${q.text}</div>
+        <div class="qhint">${q.hint || ""}</div>`;
+
+      if (q.type === "choice") {
+        html += `<div class="opts">`;
+        q.options.forEach(o => {
+          const sel = this.answers[q.id] === o.v ? "sel" : "";
+          html += `<button class="opt ${sel}" onclick="App.pick('${q.id}','${o.v}')">
+            <span class="dot"></span>
+            <span>${o.t}${o.s ? `<small>${o.s}</small>` : ""}</span>
+          </button>`;
+        });
+        html += `</div>`;
+      } else if (q.type === "number") {
+        const val = this.answers[q.id] != null ? this.answers[q.id] : "";
+        html += `<input class="num-input" type="number" inputmode="numeric"
+                   min="${q.min}" max="${q.max}" value="${val}"
+                   placeholder="0"
+                   oninput="App.setNum('${q.id}', this.value)" />
+                 <div class="input-suffix">${q.suffix || ""}</div>`;
+      }
+      card.innerHTML = html;
+    },
+
+    pick(id, v) {
+      this.answers[id] = v;
+      // categoria muda o conjunto de perguntas → refaz a ordem
+      if (id === "category") this.rebuildOrder();
+      this.render();
+    },
+
+    setNum(id, v) {
+      this.answers[id] = v === "" ? null : Math.max(0, Number(v));
+    },
+
+    next() {
+      const q = this.current();
+      // validação leve: exige resposta antes de avançar
+      if (this.answers[q.id] == null || this.answers[q.id] === "") {
+        const card = document.getElementById("q-card");
+        card.style.borderColor = "var(--negative)";
+        setTimeout(() => card.style.borderColor = "", 600);
+        return;
+      }
+      if (this.idx < this.order.length - 1) {
+        this.idx++;
+        this.render();
+        window.scrollTo(0, 0);
+      } else {
+        this.finish();
+      }
+    },
+
+    back() {
+      if (this.idx > 0) { this.idx--; this.render(); window.scrollTo(0, 0); }
+    },
+
+    /* ---------------- cálculo da elegibilidade ---------------- */
+    finish() {
+      const a = this.answers;
+      const cat = CATEGORIES[a.category] || CATEGORIES.other;
+      const met = [], attention = [], problems = [], weights = [];
+      let score = 0, maxScore = 0;
+
+      // helper de pontuação
+      const add = (label, got, max, bucket, msg) => {
+        score += got; maxScore += max;
+        weights.push({ label, got, max });
+        if (bucket === "ok") met.push(msg);
+        else if (bucket === "warn") attention.push(msg);
+        else if (bucket === "bad") problems.push(msg);
+      };
+
+      // ---- 1) TEMPO DE RESIDÊNCIA (peso alto: 25) ----
+      const needRes = cat.residenceYears;
+      const haveRes = Number(a.yearsInJapan) || 0;
+      if (haveRes >= needRes) {
+        add(`Tempo de residência (≥ ${needRes} anos)`, 25, 25, "ok",
+          `Tempo de residência compatível: ${haveRes} anos (exigido ${needRes} para ${cat.label}).`);
+      } else if (haveRes >= needRes * 0.7) {
+        add(`Tempo de residência (≥ ${needRes} anos)`, 12, 25, "warn",
+          `Tempo de residência quase suficiente: ${haveRes} de ${needRes} anos exigidos.`);
+      } else {
+        add(`Tempo de residência (≥ ${needRes} anos)`, 4, 25, "bad",
+          `Tempo de residência abaixo do exigido: ${haveRes} de ${needRes} anos para ${cat.label}.`);
+      }
+
+      // ---- 1b) CASAMENTO (cônjuges) — peso alto na categoria (15) ----
+      if (["spouse_jp", "spouse_pr"].includes(a.category)) {
+        const m = Number(a.marriageYears) || 0;
+        if (m >= cat.marriageYears) {
+          add(`Casamento ≥ ${cat.marriageYears} anos`, 15, 15, "ok",
+            `Tempo de casamento compatível: ${m} anos (exigido ${cat.marriageYears}).`);
+        } else {
+          add(`Casamento ≥ ${cat.marriageYears} anos`, 5, 15, "bad",
+            `Casamento ainda abaixo do exigido: ${m} de ${cat.marriageYears} anos.`);
+        }
+        // coabitação
+        if (a.livingTogether === "yes") {
+          add("Coabitação com cônjuge", 6, 6, "ok", "Mora junto com o cônjuge (estabilidade familiar).");
+        } else {
+          add("Coabitação com cônjuge", 1, 6, "warn", "Não coabitar com o cônjuge pode exigir justificativa.");
+        }
+      }
+
+      // ---- 1c) TEMPO NO STATUS DE TRABALHO (categorias gerais) ----
+      if (cat.workYears) {
+        const ys = Number(a.yearsStatus) || 0;
+        if (ys >= cat.workYears) {
+          add(`≥ ${cat.workYears} anos no status de trabalho`, 10, 10, "ok",
+            `Tempo no status atual compatível: ${ys} anos (exigido ${cat.workYears}).`);
+        } else {
+          add(`≥ ${cat.workYears} anos no status de trabalho`, 3, 10, "warn",
+            `Tempo no status de trabalho abaixo de ${cat.workYears} anos (${ys} anos).`);
+        }
+      }
+
+      // ---- 2) PRAZO DO VISTO ATUAL (peso importante: 12) ----
+      // Exige-se estar no maior prazo previsto (na prática, 3 ou 5 anos).
+      if (a.visaPeriod === "5" || a.visaPeriod === "3") {
+        add("Prazo do visto (mais longo)", 12, 12, "ok",
+          `Prazo de visto adequado (${a.visaPeriod} anos) — atende ao requisito do maior prazo.`);
+      } else if (a.visaPeriod === "1") {
+        add("Prazo do visto (mais longo)", 4, 12, "warn",
+          "Visto de 1 ano pode ser insuficiente — exige-se o maior prazo previsto para o status.");
+      } else {
+        add("Prazo do visto (mais longo)", 6, 12, "warn",
+          "Verifique se o seu visto está no maior prazo previsto para o seu status.");
+      }
+
+      // ---- 3) OBRIGAÇÕES PÚBLICAS: pagamento em dia (peso alto: 22) ----
+      // Aplica-se a todos; é parte do requisito de interesse nacional (国益適合).
+      switch (a.paymentsOnTime) {
+        case "all_ontime":
+          add("Impostos/seguro/pensão em dia", 22, 22, "ok",
+            "Impostos, seguro saúde e pensão pagos sempre em dia.");
+          break;
+        case "minor_late":
+          add("Impostos/seguro/pensão em dia", 13, 22, "warn",
+            "Houve pequenos atrasos (já quitados) — a Imigração avalia o pagamento dentro do prazo.");
+          break;
+        case "recent_late":
+          add("Impostos/seguro/pensão em dia", 5, 22, "bad",
+            "Atrasos recentes em impostos/seguro/pensão pesam negativamente; o ideal é construir histórico em dia.");
+          break;
+        default:
+          add("Impostos/seguro/pensão em dia", 0, 22, "bad",
+            "Há valores em aberto de impostos/seguro/pensão — requisito crítico não atendido.");
+      }
+
+      // ---- 3b) inscrição em seguro/pensão (peso: 8) ----
+      if (a.insurance === "shakai" || a.insurance === "kokumin") {
+        add("Inscrição em seguro saúde + pensão", 8, 8, "ok", "Inscrito corretamente em seguro saúde e pensão.");
+      } else if (a.insurance === "partial") {
+        add("Inscrição em seguro saúde + pensão", 3, 8, "warn", "Falta inscrição em pensão (年金) — requisito avaliado.");
+      } else {
+        add("Inscrição em seguro saúde + pensão", 0, 8, "bad", "Não inscrito em seguro saúde/pensão — requisito não atendido.");
+      }
+
+      // ---- 3c) histórico de pensão (peso: 6) ----
+      if (a.pensionRecord === "yes") {
+        add("Histórico de pensão (年金)", 6, 6, "ok", "Pensão (Nenkin) em dia nos últimos 2 anos.");
+      } else if (a.pensionRecord === "late") {
+        add("Histórico de pensão (年金)", 2, 6, "warn", "Atrasos no Nenkin nos últimos 2 anos — verificado pela Imigração.");
+      } else {
+        add("Histórico de pensão (年金)", 0, 6, "bad", "Pensão não paga / desconhecida — ponto de risco.");
+      }
+
+      // ---- 4) INDEPENDÊNCIA FINANCEIRA (peso alto: 18) ----
+      // Para cônjuges/filhos, (2) é dispensado como formal → peso reduzido.
+      const finWeightMax = cat.exemptConductFinance ? 9 : 18;
+      let incScore;
+      const incMap = { lt2: 0.15, "2to3": 0.45, "3to4": 0.75, "4to6": 0.95, gt6: 1 };
+      let incFactor = incMap[a.income] != null ? incMap[a.income] : 0.5;
+      // ajuste por dependentes: cada dependente reduz um pouco o fator
+      const dep = Number(a.dependents) || 0;
+      incFactor = Math.max(0.1, incFactor - dep * 0.08);
+      incScore = Math.round(finWeightMax * incFactor);
+      if (incFactor >= 0.7) {
+        add("Independência financeira", incScore, finWeightMax, "ok",
+          "Renda compatível com independência financeira" + (dep ? ` (considerando ${dep} dependente(s)).` : "."));
+      } else if (incFactor >= 0.4) {
+        add("Independência financeira", incScore, finWeightMax, "warn",
+          "Renda no limite — pode ser apertada" + (dep ? ` para ${dep} dependente(s).` : "."));
+      } else {
+        add("Independência financeira", incScore, finWeightMax, "bad",
+          "Renda informada pode ser insuficiente para comprovar independência" + (dep ? ` com ${dep} dependente(s).` : "."));
+      }
+
+      // ---- 4b) emprego estável (peso: 6) ----
+      if (a.stableJob === "yes") {
+        add("Estabilidade de emprego/renda", 6, 6, "ok", "Emprego/renda estável e contínua.");
+      } else if (a.stableJob === "partly") {
+        add("Estabilidade de emprego/renda", 3, 6, "warn", "Renda parcial/temporária — estabilidade pode ser questionada.");
+      } else {
+        add("Estabilidade de emprego/renda", 0, 6, "bad", "Sem renda estável — afeta o requisito de subsistência.");
+      }
+
+      // ---- 5) BOA CONDUTA (peso alto: 18; reduzido p/ cônjuge/filho) ----
+      const conductMax = cat.exemptConductFinance ? 9 : 18;
+      if (a.criminal === "none") {
+        add("Boa conduta (素行善良)", conductMax, conductMax, "ok", "Sem antecedentes criminais.");
+      } else if (a.criminal === "minor") {
+        add("Boa conduta (素行善良)", Math.round(conductMax * 0.55), conductMax, "warn",
+          "Infrações leves podem ser avaliadas — acúmulo de multas conta contra a boa conduta.");
+      } else {
+        add("Boa conduta (素行善良)", 0, conductMax, "bad",
+          "Pena ou multa grave compromete seriamente o requisito de boa conduta.");
+      }
+
+      // ---- 6) GARANTIDOR (peso: 6) ----
+      if (a.guarantor === "yes") {
+        add("Fiador/garantidor (身元保証人)", 6, 6, "ok", "Possui garantidor (japonês ou residente permanente).");
+      } else {
+        add("Fiador/garantidor (身元保証人)", 1, 6, "warn", "Será necessário um garantidor japonês ou residente permanente.");
+      }
+
+      // ---- COMPLEMENTAR: japonês (NÃO é requisito formal → não soma no máx) ----
+      // Tratado apenas como observação, sem peso decisivo.
+      if (a.japanese === "no") {
+        attention.push("Conhecimento de japonês é apenas complementar (não é requisito formal), mas ajuda na vida diária e na documentação.");
+      } else if (a.japanese === "yes" || a.japanese === "basic") {
+        met.push("Conhecimento de japonês (informação complementar — não é requisito formal).");
+      }
+
+      // nota final
+      const finalPct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+      this.showResult({ cat, finalPct, met, attention, problems, weights, answers: a });
+    },
+
+    /* ---------------- tela de resultado ---------------- */
+    showResult({ cat, finalPct, met, attention, problems, weights }) {
+      // classificação
+      let verdict, vcolor, vsub, ringColor;
+      const seriousProblems = problems.length;
+      if (finalPct >= 80 && seriousProblems === 0) {
+        verdict = "Alta chance de estar qualificado";
+        vsub = "Você parece cumprir os principais requisitos. Reúna a documentação e considere consultar um especialista.";
+        vcolor = "var(--positive)"; ringColor = "var(--positive)";
+      } else if (finalPct >= 60) {
+        verdict = "Possivelmente qualificado, com pontos de atenção";
+        vsub = "Há requisitos importantes a fortalecer antes de aplicar. Veja os pontos de atenção abaixo.";
+        vcolor = "var(--warning)"; ringColor = "var(--warning)";
+      } else if (finalPct >= 35) {
+        verdict = "Ainda não parece cumprir requisitos importantes";
+        vsub = "Vários critérios essenciais ainda não foram atendidos. Trabalhe-os antes de solicitar.";
+        vcolor = "var(--negative)"; ringColor = "var(--negative)";
+      } else {
+        verdict = "Dados insuficientes ou requisitos longe de serem cumpridos";
+        vsub = "A análise indica que faltam bases importantes. Reavalie com um gyoseishoshi.";
+        vcolor = "var(--negative)"; ringColor = "var(--negative)";
+      }
+
+      // ----- DOCUMENTOS: monta a lista detalhada e filtrada -----
+      const a2 = this.answers;
+      // quantos anos de comprovante tributário (住民税/その３) pela categoria:
+      // trabalho/outro = 5 anos; filho = 1 ano; demais = 3 anos (regra ISA)
+      const taxYears =
+        (["work", "other"].includes(a2.category)) ? "5 anos"
+        : (["child_jp", "child_pr"].includes(a2.category)) ? "1 ano"
+        : "3 anos";
+      const isSelfEmployed = a2.stableJob === "partly" || a2.stableJob === "no";
+
+      // decide se um documento aparece, conforme respostas
+      const docVisible = (d) => {
+        if (d.catOnly && !d.catOnly.includes(a2.category)) return false;
+        if (d.insuranceOnly && !d.insuranceOnly.includes(a2.insurance)) return false;
+        if (d.jobOnly && !isSelfEmployed) return false;
+        return true;
+      };
+      const wWhere = (k) => {
+        const m = INSTITUTIONS.find(i => i.k === k) || { icon: "📂", t: k };
+        return `<span class="where ${k}">${m.icon} ${m.t.split(" — ")[0]}</span>`;
+      };
+      const docHtml = (d) => {
+        const yrs = d.yearsKey === "taxYears" ? taxYears : d.years;
+        const dls = (d.dl || []).map(x =>
+          `<a class="dl ${x.alt ? "alt" : ""}" href="${x.url}" target="_blank" rel="noopener" download>⬇ ${x.label}</a>`
+        ).join("");
+        return `<div class="doc">
+          <div class="doc-top">
+            <div class="doc-name">${d.name}<span class="jp">${d.jp}</span></div>
+          </div>
+          <div class="doc-meta">${wWhere(d.where)}${yrs ? `<span class="yr">📅 ${yrs}</span>` : ""}</div>
+          ${d.note ? `<div class="doc-note">${d.note}</div>` : ""}
+          ${dls ? `<div class="dl-row">${dls}</div>` : ""}
+        </div>`;
+      };
+      const groupsHtml = DOC_GROUPS.map(g => {
+        const visible = g.docs.filter(docVisible);
+        if (!visible.length) return "";
+        return `<div class="doc-group">
+          <div class="doc-group-h">${g.title}</div>
+          <div class="doc-group-sub">${g.sub}</div>
+          ${visible.map(docHtml).join("")}
+        </div>`;
+      }).join("");
+      const legendHtml = INSTITUTIONS.map(i =>
+        `<span class="where ${i.k}">${i.icon} ${i.t}</span>`
+      ).join("");
+
+      // pesos que mais influenciaram (ordena por peso máximo)
+      const topWeights = [...weights].sort((x, y) => y.max - x.max).slice(0, 6);
+
+      const li = (cls, ic, msg) => `<li class="${cls}"><span class="ic">${ic}</span><span class="tx">${msg}</span></li>`;
+
+      const html = `
+        <div class="card fade" style="text-align:center;">
+          <a class="back-link" href="#" onclick="App.start();return false;">↻ Refazer</a>
+          <span class="cat-badge" style="display:block;margin:10px auto 4px;max-width:max-content;">
+            ${cat.label} · ${cat.jp}
+          </span>
+          <div class="score-ring" style="background:
+              conic-gradient(${ringColor} ${finalPct * 3.6}deg, var(--bg-elev) 0deg);">
+            <div style="position:absolute;inset:14px;border-radius:50%;background:var(--bg-card);
+                        display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <div class="pct" style="color:${ringColor};">${finalPct}%</div>
+              <div class="lbl">dos critérios</div>
+            </div>
+          </div>
+          <div class="verdict" style="background:${hexBg(ringColor)};color:${ringColor};">
+            ${verdict}
+            <small style="color:var(--text-sub);">${vsub}</small>
+          </div>
+          <p class="muted" style="margin-top:10px;">
+            Estimativa: você cumpre aproximadamente <b style="color:${ringColor};">${finalPct}%</b>
+            dos critérios avaliados para a categoria <b>${cat.label}</b>.
+          </p>
+          <div class="notice info" style="text-align:left;margin-top:12px;">
+            ℹ️ Regra aplicada: <b>${cat.note}</b>
+          </div>
+        </div>
+
+        ${met.length ? `<div class="card fade">
+          <div class="sect-title" style="color:var(--positive);">✅ Requisitos cumpridos</div>
+          <ul class="list">${met.map(m => li("ok", "✅", m)).join("")}</ul>
+        </div>` : ""}
+
+        ${attention.length ? `<div class="card fade">
+          <div class="sect-title" style="color:var(--warning);">⚠️ Pontos de atenção</div>
+          <ul class="list">${attention.map(m => li("warn", "⚠️", m)).join("")}</ul>
+        </div>` : ""}
+
+        ${problems.length ? `<div class="card fade">
+          <div class="sect-title" style="color:var(--negative);">⛔ Pontos problemáticos</div>
+          <ul class="list">${problems.map(m => li("bad", "⛔", m)).join("")}</ul>
+        </div>` : ""}
+
+        <div class="card fade">
+          <div class="sect-title">⚖️ Critérios que mais pesaram</div>
+          <p class="muted" style="margin-bottom:10px;">Veja onde sua pontuação foi mais decisiva nesta categoria.</p>
+          ${topWeights.map(w => {
+            const r = w.max ? Math.round((w.got / w.max) * 100) : 0;
+            const c = r >= 80 ? "var(--positive)" : r >= 50 ? "var(--warning)" : "var(--negative)";
+            return `<div class="weight-row">
+              <span style="min-width:120px;color:var(--text-sub);">${w.label}</span>
+              <span class="wbar"><i style="width:${r}%;background:${c};"></i></span>
+              <span style="color:${c};font-weight:700;min-width:36px;text-align:right;">${r}%</span>
+            </div>`;
+          }).join("")}
+        </div>
+
+        <!-- CARD: renda em detalhe -->
+        <div class=”card fade”>
+          <div class=”sect-title”>💴 Sobre a renda — o que a Imigração avalia</div>
+          <div class=”callout”>
+            <b>Não existe um valor mínimo fixo na lei.</b> A Imigração avalia se você consegue
+            se sustentar <em>sem se tornar um encargo público</em>. Na prática, despachantes e
+            consultores citam <b>¥3.000.000/ano</b> como referência comum para vistos de trabalho
+            — mas isso varia por região, número de dependentes e estabilidade do vínculo
+            empregatício. Uma renda menor com emprego estável e histórico longo pode pesar mais do
+            que uma renda alta recente.
+          </div>
+          <ul class=”list”>
+            <li class=”warn”><span class=”ic”>⚠️</span><span class=”tx”>
+              <b>Com dependentes:</b> a renda exigida sobe. Não há tabela oficial, mas cada
+              dependente aumenta o que a Imigração espera ver comprovado.
+            </span></li>
+            <li class=”ok”><span class=”ic”>✅</span><span class=”tx”>
+              <b>Documentos-chave de renda:</b> 源泉徴収票 (retido em fonte), holerites recentes,
+              e 課税証明書 da prefeitura (que mostra a renda tributável).
+            </span></li>
+            <li class=”ok”><span class=”ic”>✅</span><span class=”tx”>
+              <b>Reservas bancárias</b> (預貯金通帳) reforçam a prova mesmo sem renda alta.
+            </span></li>
+          </ul>
+        </div>
+
+        <!-- CARD: 了解書 — formulário de consentimento (o “pré-formulário” mencionado) -->
+        <div class=”card fade”>
+          <div class=”sect-title”>📜 O formulário que declara o histórico de pagamentos</div>
+          <div class=”callout”>
+            Desde <b>outubro de 2021</b>, a Imigração exige a <b>了解書 (Termo de Consentimento)</b>
+            obrigatório. Você declara ter ciência de que impostos, pensão e seguro saúde devem
+            estar pagos <b>dentro do prazo</b> — e que o visto permanente pode ser
+            <b>cancelado</b> se você deixar de cumprir essas obrigações no futuro.
+            <br><br>
+            É neste documento que fica registrado que você <b>entende e concorda</b> com as
+            regras. O formulário está disponível em português. Baixe, leia com atenção e assine.
+          </div>
+          <div class=”dl-row”>
+            <a class=”dl” href=”${ISA}001356131.pdf” target=”_blank” rel=”noopener” download>⬇ Baixar em Português</a>
+            <a class=”dl alt” href=”${ISA}001355579.pdf” target=”_blank” rel=”noopener” download>⬇ 日本語版</a>
+            <a class=”dl alt” href=”${ISA}001356126.pdf” target=”_blank” rel=”noopener” download>⬇ English</a>
+          </div>
+        </div>
+
+        <!-- CARD: idioma japonês -->
+        <div class=”card fade”>
+          <div class=”sect-title”>🇯🇵 Sobre o conhecimento de japonês</div>
+          <div class=”callout”>
+            O idioma japonês <b>não é um requisito formal geral</b> para o visto permanente, ao
+            contrário da naturalização (帰化). A Imigração não exige certificado de proficiência
+            (JLPT) para o permanente.
+            <br><br>
+            No entanto, <b>na prática</b>, comunicar-se em japonês facilita: a elaboração da
+            “Carta de motivos” (理由書), o contato direto no balcão, e demonstra integração à
+            sociedade japonesa — o que é avaliado subjetivamente como parte da “boa conduta” e do
+            conceito de “国益に合すること” (conformidade com o interesse do Japão).
+          </div>
+        </div>
+
+        <!-- CARD: documentos detalhados com origem -->
+        <div class=”card fade”>
+          <div class=”sect-title”>📄 Documentos para reunir — onde cada um é obtido</div>
+          <p class=”muted” style=”margin-bottom:12px;”>
+            Filtramos abaixo conforme as suas respostas. Cores indicam a instituição responsável.
+          </p>
+          <div class=”legend”>${legendHtml}</div>
+          <div class=”callout” style=”margin-bottom:16px;”>
+            ⚠️ <b>Atenção ao “納税証明書”:</b> existem dois documentos com esse nome — um da
+            <b>prefeitura</b> (住民税, imposto municipal) e um da <b>receita nacional (税務署)</b>
+            (impostos federais / その３). Os dois podem ser exigidos e <b>não são intercambiáveis</b>.
+          </div>
+          ${groupsHtml}
+          <div class=”dl-row” style=”margin-top:14px;”>
+            <a class=”dl alt” href=”${PROC_URL}” target=”_blank” rel=”noopener”>🔗 Página oficial ISA (procedimento)</a>
+          </div>
+        </div>
+
+        <div class=”card fade”>
+          <div class=”btn-row”>
+            <button class=”btn btn-ghost btn-sm” onclick=”App.start()”>↻ Refazer análise</button>
+            <button class=”btn btn-primary btn-sm” onclick=”App.goIntro()”>Início</button>
+          </div>
+        </div>
+
+        <div class=”legal”>
+          <b>Esta ferramenta oferece apenas uma estimativa</b> baseada em requisitos
+          públicos da Imigração Japonesa. Ela <b>não garante aprovação</b> do visto
+          permanente. A decisão final pertence à <b>Immigration Services Agency of
+          Japan (出入国在留管理庁)</b>. Para casos específicos, consulte um advogado,
+          <b>gyoseishoshi (行政書士)</b> ou especialista em imigração.<br><br>
+          Fontes: “永住許可に関するガイドライン” (revisão 令和8年/2026) ·
+          <a href=”${PROC_URL}” target=”_blank” rel=”noopener”>永住許可申請 — ISA</a> ·
+          “Permission for permanent residence (Immigration Control Act, Article 22)”.
+        </div>
+      `;
+
+      const r = document.getElementById("screen-result");
+      r.innerHTML = html;
+      show("screen-quiz", false);
+      show("screen-result", true);
+      window.scrollTo(0, 0);
+    },
+
+    goIntro() {
+      show("screen-result", false);
+      show("screen-quiz", false);
+      show("screen-intro", true);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  /* utilidades */
+  function show(id, on) { document.getElementById(id).classList.toggle("hide", !on); }
+  function hexBg(varColor) {
+    // fundo translúcido a partir da cor do veredito
+    const map = {
+      "var(--positive)": "rgba(34,197,94,0.1)",
+      "var(--warning)":  "rgba(245,158,11,0.1)",
+      "var(--negative)": "rgba(239,68,68,0.1)"
+    };
+    return map[varColor] || "var(--bg-elev)";
+  }
+  </script>
+</body>
+</html>
